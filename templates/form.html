@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Nouveau devis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Nouveau devis</h1>
+  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour</a>
+</div>
+
+<form method="post" class="card" id="devis-form">
+  <section class="form-section">
+    <h2>Client</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="client_nom">Nom du client <span class="req">*</span></label>
+        <input type="text" id="client_nom" name="client_nom" required
+               value="{{ form.client_nom or '' }}" placeholder="M. Martin / SARL Dubois">
+      </div>
+      <div class="field">
+        <label for="client_email">Email</label>
+        <input type="email" id="client_email" name="client_email"
+               value="{{ form.client_email or '' }}" placeholder="client@email.fr">
+      </div>
+    </div>
+    <div class="field">
+      <label for="client_adresse">Adresse</label>
+      <textarea id="client_adresse" name="client_adresse" rows="2"
+                placeholder="N&deg; et rue&#10;Code postal et ville">{{ form.client_adresse or '' }}</textarea>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Prestations</h2>
+    <div class="table-wrap">
+      <table class="lignes-table" id="lignes-table">
+        <thead>
+          <tr>
+            <th class="col-des">Designation</th>
+            <th class="col-qte">Qte</th>
+            <th class="col-pu">P.U. HT</th>
+            <th class="col-tva">TVA</th>
+            <th class="col-tot num">Total HT</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="lignes-body">
+          <!-- lignes injectees par JS -->
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn btn-light" id="add-ligne">+ Ajouter une prestation</button>
+  </section>
+
+  <section class="form-section">
+    <h2>Notes (optionnel)</h2>
+    <div class="field">
+      <textarea name="notes" rows="2" placeholder="Informations complementaires, details du chantier...">{{ form.notes or '' }}</textarea>
+    </div>
+  </section>
+
+  <div class="totaux-preview" id="totaux-preview">
+    <div class="tp-row"><span>Total HT</span><b id="tp-ht">0,00 EUR</b></div>
+    <div class="tp-row"><span>TVA</span><b id="tp-tva">0,00 EUR</b></div>
+    <div class="tp-row tp-ttc"><span>Total TTC</span><b id="tp-ttc">0,00 EUR</b></div>
+  </div>
+
+  <div class="form-actions">
+    <a href="{{ url_for('index') }}" class="btn btn-light">Annuler</a>
+    <button type="submit" class="btn btn-primary">Enregistrer le devis</button>
+  </div>
+</form>
+
+<template id="ligne-template">
+  <tr class="ligne">
+    <td data-label="Designation"><input type="text" name="designation[]" placeholder="Ex : Pose carrelage 60x60"></td>
+    <td data-label="Qte"><input type="text" inputmode="decimal" name="quantite[]" class="qte" value="1"></td>
+    <td data-label="P.U. HT"><input type="text" inputmode="decimal" name="prix_unitaire[]" class="pu" value="0"></td>
+    <td data-label="TVA">
+      <select name="tva_taux[]" class="tva">
+        {% for t in taux_tva %}<option value="{{ t }}" {{ 'selected' if t == 20.0 }}>{{ '%g'|format(t) }} %</option>{% endfor %}
+      </select>
+    </td>
+    <td data-label="Total HT" class="num ligne-total">0,00 EUR</td>
+    <td class="col-del"><button type="button" class="btn-del" title="Supprimer">&times;</button></td>
+  </tr>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const body = document.getElementById('lignes-body');
+  const tpl = document.getElementById('ligne-template');
+
+  function fmtEuro(n) {
+    return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' EUR';
+  }
+  function parseNum(v) {
+    return parseFloat((v || '0').toString().replace(',', '.')) || 0;
+  }
+  function recalc() {
+    let ht = 0, tva = 0;
+    body.querySelectorAll('.ligne').forEach(tr => {
+      const q = parseNum(tr.querySelector('.qte').value);
+      const pu = parseNum(tr.querySelector('.pu').value);
+      const t = parseNum(tr.querySelector('.tva').value);
+      const lht = q * pu;
+      ht += lht;
+      tva += lht * t / 100;
+      tr.querySelector('.ligne-total').textContent = fmtEuro(lht);
+    });
+    document.getElementById('tp-ht').textContent = fmtEuro(ht);
+    document.getElementById('tp-tva').textContent = fmtEuro(tva);
+    document.getElementById('tp-ttc').textContent = fmtEuro(ht + tva);
+  }
+  function addLigne() {
+    body.appendChild(tpl.content.cloneNode(true));
+    recalc();
+  }
+  body.addEventListener('input', recalc);
+  body.addEventListener('change', recalc);
+  body.addEventListener('click', e => {
+    if (e.target.classList.contains('btn-del')) {
+      e.target.closest('.ligne').remove();
+      recalc();
+    }
+  });
+  document.getElementById('add-ligne').addEventListener('click', addLigne);
+
+  // Au moins une ligne au chargement
+  addLigne();
+</script>
+{% endblock %}

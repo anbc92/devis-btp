@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ devis.numero }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ devis.numero }}</h1>
+    <p class="muted">Cree le {{ devis.date_creation }}</p>
+  </div>
+  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour a la liste</a>
+</div>
+
+<div class="toolbar">
+  <a href="{{ url_for('pdf_devis', devis_id=devis.id) }}" class="btn btn-primary" target="_blank">Telecharger / Imprimer le PDF</a>
+  <form method="post" action="{{ url_for('changer_statut', devis_id=devis.id) }}" class="statut-form">
+    <label class="muted">Statut :</label>
+    <select name="statut" class="statut-select statut-{{ devis.statut }}" onchange="this.form.submit()">
+      {% for s in STATUTS %}
+      <option value="{{ s }}" {{ 'selected' if s == devis.statut }}>{{ s | statut_label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <form method="post" action="{{ url_for('supprimer', devis_id=devis.id) }}"
+        onsubmit="return confirm('Supprimer definitivement ce devis ?');" class="ml-auto">
+    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="client-block">
+    <h2>Client</h2>
+    <p class="strong">{{ devis.client_nom }}</p>
+    {% if devis.client_adresse %}<p class="muted">{{ devis.client_adresse | replace('\n', '<br>') | safe }}</p>{% endif %}
+    {% if devis.client_email %}<p class="muted">{{ devis.client_email }}</p>{% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Designation</th>
+          <th class="num">Qte</th>
+          <th class="num">P.U. HT</th>
+          <th class="num">TVA</th>
+          <th class="num">Total HT</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prestations %}
+        <tr>
+          <td data-label="Designation">{{ p.designation }}</td>
+          <td data-label="Qte" class="num">{{ '%g'|format(p.quantite) }}</td>
+          <td data-label="P.U. HT" class="num">{{ p.prix_unitaire | euro }}</td>
+          <td data-label="TVA" class="num">{{ '%g'|format(p.tva_taux) }} %</td>
+          <td data-label="Total HT" class="num strong">{{ p.total_ht | euro }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="totaux-final">
+    <div class="tf-row"><span>Total HT</span><b>{{ totaux.total_ht | euro }}</b></div>
+    {% for v in totaux.ventilation %}
+    <div class="tf-row"><span>TVA {{ '%g'|format(v.taux) }} %</span><b>{{ v.montant | euro }}</b></div>
+    {% endfor %}
+    <div class="tf-row tf-ttc"><span>Total TTC</span><b>{{ totaux.total_ttc | euro }}</b></div>
+  </div>
+
+  {% if devis.notes %}
+  <div class="notes-block">
+    <h3>Notes</h3>
+    <p class="muted">{{ devis.notes | replace('\n', '<br>') | safe }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

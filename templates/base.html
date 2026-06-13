@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Devis BTP{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="{{ url_for('index') }}" class="brand">
+        <span class="logo">BTP</span>
+        <span>{{ ARTISAN.nom }} <small>&middot; Devis</small></span>
+      </a>
+      <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
+    </div>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      {{ ARTISAN.nom }} &middot; SIRET {{ ARTISAN.siret }} &middot;
+      {{ ARTISAN.telephone }} &middot; {{ ARTISAN.email }}
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
