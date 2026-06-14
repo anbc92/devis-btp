@@ -10,6 +10,7 @@ from pathlib import Path
 
 from db import get_db
 from config import ARTISAN, CONDITIONS
+from chiffrement import chiffrer, dechiffrer
 
 # Champs editables via le formulaire /profil (= colonnes de la table profil)
 CHAMPS_PROFIL = [
@@ -89,9 +90,13 @@ def get_profil(user_id=None):
     data["acompte_pct"] = CONDITIONS["acompte_pct"]
     data["mentions"] = CONDITIONS["mentions"]
 
-    # Config SMTP : valeur en base sinon variable d'environnement
+    # Config SMTP : valeur en base sinon variable d'environnement.
+    # Le mot de passe est dechiffre (stocke chiffre au repos).
     for cle, env in _SMTP_ENV.items():
-        valeur = (data.get(cle) or "").strip()
+        if cle == "mail_password":
+            valeur = dechiffrer(data.get(cle) or "")
+        else:
+            valeur = (data.get(cle) or "").strip()
         data[cle] = valeur or os.environ.get(env, "").strip()
     if not data["mail_from"]:
         data["mail_from"] = data["mail_username"]
@@ -136,9 +141,22 @@ def save_profil(user_id, valeurs, logo_path=None):
 def save_smtp(user_id, valeurs):
     """Enregistre (upsert) la config SMTP de `user_id`. `valeurs` : CHAMPS_SMTP.
 
-    Ne touche pas aux autres colonnes du profil.
+    Le mot de passe est chiffre avant stockage. S'il est laisse vide, l'ancien
+    mot de passe est conserve. Ne touche pas aux autres colonnes du profil.
     """
     conn = get_db()
+    nouveau_mdp = (valeurs.get("mail_password") or "").strip()
+    if nouveau_mdp:
+        mdp_stocke = chiffrer(nouveau_mdp)
+    else:
+        row = conn.execute(
+            "SELECT mail_password FROM profil WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        mdp_stocke = row["mail_password"] if row else ""
+
+    vals = {c: (valeurs.get(c) or "").strip() for c in CHAMPS_SMTP}
+    vals["mail_password"] = mdp_stocke
+    vals["user_id"] = user_id
     conn.execute(
         """
         INSERT INTO profil (user_id, mail_server, mail_port, mail_username,
@@ -152,8 +170,7 @@ def save_smtp(user_id, valeurs):
             mail_password = excluded.mail_password,
             mail_from = excluded.mail_from
         """,
-        {**{c: (valeurs.get(c) or "").strip() for c in CHAMPS_SMTP},
-         "user_id": user_id},
+        vals,
     )
     conn.commit()
     conn.close()

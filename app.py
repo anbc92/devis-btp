@@ -1,6 +1,7 @@
 """Application web de generation de devis pour artisans BTP (V1)."""
 
 import os
+import secrets
 from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
@@ -13,6 +14,8 @@ from flask import (
     flash, session,
 )
 from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Charge les variables d'environnement depuis le fichier .env (si present).
 load_dotenv()
@@ -34,9 +37,16 @@ def _flag_env(nom, defaut=False):
 
 
 app = Flask(__name__)
-# Cle secrete des sessions : depuis l'environnement en production.
-# La valeur de repli ne sert qu'au developpement local.
-app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+
+# Cle secrete des sessions : depuis l'environnement. Si absente, on genere une
+# cle ephemere (jamais de cle previsible codee en dur).
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    _secret = secrets.token_hex(32)
+    app.logger.warning(
+        "SECRET_KEY absente de l'environnement : cle ephemere generee "
+        "(les sessions ne survivront pas a un redemarrage).")
+app.secret_key = _secret
 
 # Securite des cookies de session
 app.config.update(
@@ -48,6 +58,10 @@ app.config.update(
 
 # Protection CSRF sur toutes les requetes mutantes (POST/PUT/PATCH/DELETE).
 csrf = CSRFProtect(app)
+
+# Anti-brute-force (limites par adresse IP). En production, utiliser un backend
+# partage (ex: storage_uri="redis://...").
+limiter = Limiter(get_remote_address, app=app, storage_uri="memory://")
 
 # Cree les tables manquantes (dont users/profil) au demarrage, quel que soit
 # le mode de lancement (python app.py, flask run, serveur WSGI...).
@@ -170,6 +184,7 @@ def _parse_lignes(form):
 
 
 @app.route("/inscription", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"])
 def inscription():
     if current_user_id():
         return redirect(url_for("index"))
@@ -213,6 +228,7 @@ def inscription():
 
 
 @app.route("/connexion", methods=["GET", "POST"])
+@limiter.limit("10 per minute; 50 per hour", methods=["POST"])
 def connexion():
     if current_user_id():
         return redirect(url_for("index"))
@@ -243,7 +259,7 @@ def connexion():
     return render_template("connexion.html", form={})
 
 
-@app.route("/deconnexion")
+@app.route("/deconnexion", methods=["POST"])
 def deconnexion():
     session.clear()
     flash("Déconnecté.", "ok")
@@ -352,6 +368,7 @@ def envoyer(devis_id):
         abort(404)
     devis = dict(row)
     prestations = _charger_prestations(devis_id, conn)
+    conn.close()  # libere la connexion avant les operations lentes (PDF, SMTP)
 
     destinataire = request.form.get("destinataire", "").strip()
     objet = request.form.get("objet", "").strip() or f"Devis {devis['numero']}"
@@ -363,10 +380,10 @@ def envoyer(devis_id):
         envoyer_devis(prof, destinataire, objet, message,
                       pdf_buf.getvalue(), f"{devis['numero']}.pdf")
     except MailError as exc:
-        conn.close()
         flash(str(exc), "error")
         return redirect(url_for("voir", devis_id=devis_id))
 
+    conn = get_db()
     conn.execute("UPDATE devis SET statut = 'envoye' WHERE id = ?", (devis_id,))
     conn.commit()
     conn.close()

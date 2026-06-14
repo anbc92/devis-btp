@@ -44,8 +44,8 @@
       <div class="field">
         <label for="mail_password">Mot de passe</label>
         <input type="password" id="mail_password" name="mail_password"
-               value="{{ form.mail_password or '' }}"
-               placeholder="mot de passe ou clé d'application" autocomplete="new-password">
+               placeholder="{{ 'laisser vide pour conserver' if form.mail_password else 'mot de passe ou clé d’application' }}"
+               autocomplete="new-password">
       </div>
     </div>
     <div class="field">

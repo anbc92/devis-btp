@@ -19,7 +19,10 @@
         <a href="{{ url_for('profil') }}" class="btn btn-light">Mon profil &#9881;&#65039;</a>
         <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
         <span class="user-email" title="Connecté">{{ session.email }}</span>
-        <a href="{{ url_for('deconnexion') }}" class="btn btn-light">Déconnexion</a>
+        <form method="post" action="{{ url_for('deconnexion') }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-light">Déconnexion</button>
+        </form>
         {% else %}
         <a href="{{ url_for('connexion') }}" class="btn btn-light">Connexion</a>
         <a href="{{ url_for('inscription') }}" class="btn btn-primary">Inscription</a>

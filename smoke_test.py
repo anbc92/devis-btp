@@ -8,8 +8,10 @@ from pdf import generer_pdf
 from calculs import calcul_totaux
 import app as appmod
 
-# Desactive la verification CSRF pour les POST du client de test.
+# Desactive CSRF et rate-limiting pour les POST du client de test.
 appmod.app.config["WTF_CSRF_ENABLED"] = False
+appmod.app.config["RATELIMIT_ENABLED"] = False
+appmod.limiter.enabled = False
 
 seed.run()
 
