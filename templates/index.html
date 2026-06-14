@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>Mes devis</h1>
-  <p class="muted">{{ devis_list|length }} devis au total</p>
+  <p class="muted">{{ total }} devis au total</p>
 </div>
 
 {% if devis_list %}
@@ -50,6 +50,18 @@
     </tbody>
   </table>
 </div>
+
+{% if pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <a class="btn btn-sm" href="{{ url_for('index', page=page-1) }}">&larr; Précédent</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn-sm" href="{{ url_for('index', page=page+1) }}">Suivant &rarr;</a>
+  {% endif %}
+</nav>
+{% endif %}
 {% else %}
 <div class="empty">
   <p>Aucun devis pour le moment.</p>

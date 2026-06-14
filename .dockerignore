@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+.env
+devis.db
+*.db
+static/uploads
+test_devis.pdf
+*.bundle

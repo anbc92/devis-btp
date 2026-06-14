@@ -14,34 +14,21 @@ def config_smtp_ok(profil):
                 and (profil.get("mail_from") or profil.get("mail_username")))
 
 
-def envoyer_devis(profil, destinataire, objet, corps, pdf_bytes, pdf_nom):
-    """Envoie un mail avec le PDF du devis en piece jointe.
-
-    Leve MailError en cas de config incomplete ou d'echec SMTP.
-    """
+def _envoyer(profil, msg):
+    """Connexion SMTP et envoi d'un EmailMessage deja construit."""
     serveur = (profil.get("mail_server") or "").strip()
     expediteur = (profil.get("mail_from") or profil.get("mail_username") or "").strip()
     if not serveur or not expediteur:
         raise MailError("Configuration SMTP incomplète. Renseignez-la dans "
                         "Paramètres.")
-    if not (destinataire or "").strip():
-        raise MailError("Adresse e-mail du destinataire manquante.")
-
     try:
         port = int((profil.get("mail_port") or "587").strip())
     except ValueError:
         raise MailError("Port SMTP invalide.")
 
+    msg["From"] = expediteur
     utilisateur = (profil.get("mail_username") or "").strip()
     mot_de_passe = profil.get("mail_password") or ""
-
-    msg = EmailMessage()
-    msg["Subject"] = objet
-    msg["From"] = expediteur
-    msg["To"] = destinataire
-    msg.set_content(corps)
-    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf",
-                       filename=pdf_nom)
 
     try:
         if port == 465:
@@ -64,3 +51,30 @@ def envoyer_devis(profil, destinataire, objet, corps, pdf_bytes, pdf_nom):
         raise MailError("Authentification SMTP refusée (identifiants invalides).")
     except (smtplib.SMTPException, OSError) as exc:
         raise MailError(f"Échec de l'envoi : {exc}")
+
+
+def envoyer_devis(profil, destinataire, objet, corps, pdf_bytes, pdf_nom):
+    """Envoie un mail avec le PDF du devis en piece jointe.
+
+    Leve MailError en cas de config incomplete ou d'echec SMTP.
+    """
+    if not (destinataire or "").strip():
+        raise MailError("Adresse e-mail du destinataire manquante.")
+    msg = EmailMessage()
+    msg["Subject"] = objet
+    msg["To"] = destinataire
+    msg.set_content(corps)
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf",
+                       filename=pdf_nom)
+    _envoyer(profil, msg)
+
+
+def envoyer_message(profil, destinataire, objet, corps):
+    """Envoie un simple e-mail texte (sans piece jointe)."""
+    if not (destinataire or "").strip():
+        raise MailError("Adresse e-mail du destinataire manquante.")
+    msg = EmailMessage()
+    msg["Subject"] = objet
+    msg["To"] = destinataire
+    msg.set_content(corps)
+    _envoyer(profil, msg)

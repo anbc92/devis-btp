@@ -74,4 +74,37 @@ for url in ["/devis", f"/devis/{row['id']}", f"/devis/{row['id']}/pdf",
     assert r.status_code == 200, f"{url} -> {r.status_code}"
     print(f"[OK] GET {url} -> 200 ({len(r.data)} octets)")
 
+# Page d'erreur 404 personnalisee
+r = client.get("/page-qui-nexiste-pas")
+assert r.status_code == 404 and "introuvable" in r.get_data(as_text=True), \
+    "404 personnalisee absente"
+print("[OK] page d'erreur 404 personnalisee")
+
+# Pagination presente dans le contexte
+r = client.get("/devis?page=1")
+assert r.status_code == 200
+print("[OK] /devis?page=1 -> 200 (pagination)")
+
+# Reinitialisation de mot de passe (jeton cree directement en base)
+import hashlib as _hl
+import secrets as _sec
+from datetime import datetime as _dt, timedelta as _td
+
+c2 = appmod.app.test_client()  # client non authentifie
+assert c2.get("/mot-de-passe-oublie").status_code == 200
+conn = get_db()
+uid = conn.execute("SELECT id FROM users WHERE email = ?", (EMAIL,)).fetchone()["id"]
+tok = _sec.token_urlsafe(16)
+conn.execute(
+    "INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+    (_hl.sha256(tok.encode()).hexdigest(), uid,
+     (_dt.now() + _td(hours=1)).strftime("%Y-%m-%d %H:%M:%S")),
+)
+conn.commit()
+conn.close()
+assert c2.get(f"/reinitialiser/{tok}").status_code == 200
+assert c2.post(f"/reinitialiser/{tok}", data={"password": "nouveaumdp"}).status_code == 302
+assert c2.post("/connexion", data={"email": EMAIL, "password": "nouveaumdp"}).status_code == 302
+print("[OK] reinitialisation de mot de passe")
+
 print("\nTous les tests passent.")

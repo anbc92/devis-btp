@@ -1,9 +1,11 @@
 """Couche d'acces a la base SQLite."""
 
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "devis.db"
+# Chemin de la base : surchargeable via DB_PATH (utile en conteneur/volume).
+DB_PATH = Path(os.environ.get("DB_PATH") or (Path(__file__).parent / "devis.db"))
 
 
 def get_db():
@@ -76,6 +78,14 @@ def init_db():
             password_hash   TEXT    NOT NULL,
             nom_entreprise  TEXT    NOT NULL DEFAULT '',
             created_at      TEXT    NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS password_resets (
+            token_hash  TEXT    PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            expires_at  TEXT    NOT NULL,
+            used        INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS compteurs (

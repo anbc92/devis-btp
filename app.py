@@ -1,8 +1,9 @@
 """Application web de generation de devis pour artisans BTP (V1)."""
 
 import os
+import hashlib
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from flask import (
     flash, session,
 )
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -27,7 +29,7 @@ from profil import (
     get_profil, save_profil, save_smtp, logo_rel,
     CHAMPS_PROFIL, CHAMPS_SMTP,
 )
-from mail import envoyer_devis, config_smtp_ok, MailError
+from mail import envoyer_devis, envoyer_message, config_smtp_ok, MailError
 from config import ARTISAN, CONDITIONS, TAUX_TVA, STATUTS
 
 
@@ -113,7 +115,33 @@ def login_required(view):
 @app.context_processor
 def injecter_profil():
     """Rend le profil de l'utilisateur connecte disponible dans les templates."""
-    return {"profil": get_profil(current_user_id())}
+    try:
+        return {"profil": get_profil(current_user_id())}
+    except Exception:  # ne jamais casser le rendu (ex: page d'erreur)
+        return {"profil": {}}
+
+
+@app.errorhandler(403)
+@app.errorhandler(404)
+@app.errorhandler(429)
+@app.errorhandler(500)
+def _page_erreur(err):
+    code = getattr(err, "code", 500)
+    messages = {
+        403: "Accès refusé.",
+        404: "Page introuvable.",
+        429: "Trop de tentatives. Réessayez dans quelques instants.",
+        500: "Une erreur interne est survenue.",
+    }
+    return render_template("erreur.html", code=code,
+                           message=messages.get(code, "Erreur.")), code
+
+
+@app.errorhandler(CSRFError)
+def _erreur_csrf(err):
+    return render_template(
+        "erreur.html", code=400,
+        message="Session expirée ou requête invalide. Rechargez la page."), 400
 
 
 def _charger_devis_accessible(conn, devis_id):
@@ -266,28 +294,147 @@ def deconnexion():
     return redirect(url_for("connexion"))
 
 
+def _smtp_systeme():
+    """Config SMTP "systeme" (variables d'environnement) pour les mails de
+    l'application (ex: reinitialisation de mot de passe)."""
+    return {
+        "mail_server": os.environ.get("MAIL_SERVER", ""),
+        "mail_port": os.environ.get("MAIL_PORT", "587"),
+        "mail_username": os.environ.get("MAIL_USERNAME", ""),
+        "mail_password": os.environ.get("MAIL_PASSWORD", ""),
+        "mail_from": os.environ.get("MAIL_FROM") or os.environ.get("MAIL_USERNAME", ""),
+    }
+
+
+def _hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@app.route("/mot-de-passe-oublie", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
+def mot_de_passe_oublie():
+    if current_user_id():
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        conn = get_db()
+        user = conn.execute(
+            "SELECT id FROM users WHERE email = ?", (email,)
+        ).fetchone()
+        if user:
+            token = secrets.token_urlsafe(32)
+            expire = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "INSERT INTO password_resets (token_hash, user_id, expires_at) "
+                "VALUES (?, ?, ?)",
+                (_hash_token(token), user["id"], expire),
+            )
+            conn.commit()
+            lien = url_for("reinitialiser", token=token, _external=True)
+            corps = (
+                "Bonjour,\n\nVous avez demandé la réinitialisation de votre "
+                "mot de passe. Cliquez sur ce lien (valable 1 heure) :\n\n"
+                f"{lien}\n\nSi vous n'êtes pas à l'origine de cette demande, "
+                "ignorez cet e-mail.\n"
+            )
+            try:
+                envoyer_message(_smtp_systeme(), email,
+                                "Réinitialisation de votre mot de passe", corps)
+            except MailError as exc:
+                # Pas de SMTP systeme configure : on n'expose rien a l'UI.
+                app.logger.warning("Reset mail non envoye (%s).", exc)
+                if app.debug:
+                    app.logger.warning("Lien de reinitialisation : %s", lien)
+        conn.close()
+        # Message generique (pas d'enumeration des comptes existants).
+        flash("Si un compte existe pour cet e-mail, un lien de "
+              "réinitialisation vient d'être envoyé.", "ok")
+        return redirect(url_for("connexion"))
+
+    return render_template("mot_de_passe_oublie.html")
+
+
+@app.route("/reinitialiser/<token>", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"])
+def reinitialiser(token):
+    maintenant = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db()
+    ligne = conn.execute(
+        "SELECT * FROM password_resets WHERE token_hash = ? AND used = 0 "
+        "AND expires_at > ?",
+        (_hash_token(token), maintenant),
+    ).fetchone()
+
+    if ligne is None:
+        conn.close()
+        flash("Lien invalide ou expiré. Refaites une demande.", "error")
+        return redirect(url_for("mot_de_passe_oublie"))
+
+    if request.method == "POST":
+        mdp = request.form.get("password", "")
+        if len(mdp) < 6:
+            conn.close()
+            flash("Le mot de passe doit faire au moins 6 caractères.", "error")
+            return render_template("reinitialiser.html", token=token)
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                     (generate_password_hash(mdp), ligne["user_id"]))
+        conn.execute("UPDATE password_resets SET used = 1 WHERE token_hash = ?",
+                     (_hash_token(token),))
+        conn.commit()
+        conn.close()
+        flash("Mot de passe mis à jour. Vous pouvez vous connecter.", "ok")
+        return redirect(url_for("connexion"))
+
+    conn.close()
+    return render_template("reinitialiser.html", token=token)
+
+
 @app.route("/")
 def accueil():
     return render_template("accueil.html")
 
 
+PAR_PAGE = 15
+
+
 @app.route("/devis")
 @login_required
 def index():
+    uid = current_user_id()
+    page = max(1, request.args.get("page", 1, type=int))
     conn = get_db()
+    total = conn.execute(
+        "SELECT COUNT(*) AS c FROM devis WHERE user_id = ? OR user_id IS NULL",
+        (uid,),
+    ).fetchone()["c"]
     rows = conn.execute(
-        "SELECT * FROM devis WHERE user_id = ? OR user_id IS NULL ORDER BY id DESC",
-        (current_user_id(),),
+        "SELECT * FROM devis WHERE user_id = ? OR user_id IS NULL "
+        "ORDER BY id DESC LIMIT ? OFFSET ?",
+        (uid, PAR_PAGE, (page - 1) * PAR_PAGE),
     ).fetchall()
+
+    # Charge toutes les prestations de la page en une seule requete (anti N+1).
+    ids = [r["id"] for r in rows]
+    par_devis = {}
+    if ids:
+        marqueurs = ",".join("?" * len(ids))
+        for p in conn.execute(
+            f"SELECT * FROM prestations WHERE devis_id IN ({marqueurs})", ids
+        ):
+            par_devis.setdefault(p["devis_id"], []).append(dict(p))
+    conn.close()
+
     devis_list = []
     for r in rows:
         d = dict(r)
-        prestations = _charger_prestations(d["id"], conn)
+        prestations = par_devis.get(d["id"], [])
         d["totaux"] = calcul_totaux(prestations)
         d["nb_lignes"] = len(prestations)
         devis_list.append(d)
-    conn.close()
-    return render_template("index.html", devis_list=devis_list)
+
+    pages = max(1, (total + PAR_PAGE - 1) // PAR_PAGE)
+    return render_template("index.html", devis_list=devis_list,
+                           page=page, pages=pages, total=total)
 
 
 @app.route("/devis/nouveau", methods=["GET", "POST"])

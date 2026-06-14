@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Erreur {{ code }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <div class="empty" style="margin-top:64px;">
+      <h1 style="font-size:3rem;color:var(--bleu);margin:0;">{{ code }}</h1>
+      <p>{{ message }}</p>
+      <a href="{{ url_for('accueil') }}" class="btn btn-primary">Retour à l'accueil</a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Nouveau mot de passe{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <h1>Nouveau mot de passe</h1>
+    <p class="muted">Choisissez un nouveau mot de passe.</p>
+    <form method="post" action="{{ url_for('reinitialiser', token=token) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="password">Mot de passe <span class="req">*</span></label>
+        <input type="password" id="password" name="password" required
+               autocomplete="new-password" placeholder="6 caractères minimum">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Réinitialiser</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
