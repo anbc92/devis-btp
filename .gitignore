@@ -1,0 +1,22 @@
+# Base de donnees SQLite (donnees locales, ne pas versionner)
+devis.db
+*.db
+
+# Cache et bytecode Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnements virtuels
+.venv/
+venv/
+
+# Artefacts de test
+test_devis.pdf
+
+# Logos uploades par les utilisateurs
+static/uploads/
+
+# Divers OS / editeurs
+.DS_Store
+Thumbs.db
