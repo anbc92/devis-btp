@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Paramètres d'envoi{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Paramètres d'envoi (SMTP)</h1>
+  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour</a>
+</div>
+
+<p class="muted">
+  Configuration du serveur d'envoi des devis par e-mail. Ces valeurs peuvent
+  aussi être fournies via les variables d'environnement
+  <code>MAIL_SERVER</code>, <code>MAIL_PORT</code>, <code>MAIL_USERNAME</code>,
+  <code>MAIL_PASSWORD</code>, <code>MAIL_FROM</code> (utilisées si le champ
+  correspondant est laissé vide).
+</p>
+
+<form method="post" action="{{ url_for('parametres') }}" class="card">
+  <section class="form-section">
+    <h2>Serveur SMTP</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="mail_server">Serveur SMTP</label>
+        <input type="text" id="mail_server" name="mail_server"
+               value="{{ form.mail_server or '' }}" placeholder="smtp.gmail.com">
+      </div>
+      <div class="field">
+        <label for="mail_port">Port</label>
+        <input type="text" id="mail_port" name="mail_port" inputmode="numeric"
+               value="{{ form.mail_port or '' }}" placeholder="587">
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Identifiants</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="mail_username">Nom d'utilisateur</label>
+        <input type="text" id="mail_username" name="mail_username"
+               value="{{ form.mail_username or '' }}" placeholder="contact@entreprise.fr"
+               autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="mail_password">Mot de passe</label>
+        <input type="password" id="mail_password" name="mail_password"
+               value="{{ form.mail_password or '' }}"
+               placeholder="mot de passe ou clé d'application" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="field">
+      <label for="mail_from">Adresse expéditeur (From)</label>
+      <input type="text" id="mail_from" name="mail_from"
+             value="{{ form.mail_from or '' }}" placeholder="contact@entreprise.fr">
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <a href="{{ url_for('index') }}" class="btn btn-light">Annuler</a>
+    <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
+  </div>
+</form>
+{% endblock %}

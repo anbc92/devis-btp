@@ -38,10 +38,46 @@ def init_db():
             position        INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (devis_id) REFERENCES devis(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS profil (
+            id                   INTEGER PRIMARY KEY CHECK (id = 1),
+            nom_entreprise       TEXT NOT NULL DEFAULT '',
+            gerant               TEXT NOT NULL DEFAULT '',
+            adresse              TEXT NOT NULL DEFAULT '',
+            telephone            TEXT NOT NULL DEFAULT '',
+            email                TEXT NOT NULL DEFAULT '',
+            siret                TEXT NOT NULL DEFAULT '',
+            iban                 TEXT NOT NULL DEFAULT '',
+            conditions_paiement  TEXT NOT NULL DEFAULT '',
+            logo_path            TEXT NOT NULL DEFAULT '',
+            mail_server          TEXT NOT NULL DEFAULT '',
+            mail_port            TEXT NOT NULL DEFAULT '',
+            mail_username        TEXT NOT NULL DEFAULT '',
+            mail_password        TEXT NOT NULL DEFAULT '',
+            mail_from            TEXT NOT NULL DEFAULT ''
+        );
         """
     )
+
+    # Migration : ajoute les colonnes SMTP aux bases profil deja existantes.
+    _ensure_columns(conn, "profil", {
+        "mail_server": "TEXT NOT NULL DEFAULT ''",
+        "mail_port": "TEXT NOT NULL DEFAULT ''",
+        "mail_username": "TEXT NOT NULL DEFAULT ''",
+        "mail_password": "TEXT NOT NULL DEFAULT ''",
+        "mail_from": "TEXT NOT NULL DEFAULT ''",
+    })
+
     conn.commit()
     conn.close()
+
+
+def _ensure_columns(conn, table, colonnes):
+    """Ajoute via ALTER TABLE les colonnes manquantes (migration legere)."""
+    existantes = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+    for nom, ddl in colonnes.items():
+        if nom not in existantes:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {nom} {ddl}")
 
 
 def next_numero(conn):

@@ -30,7 +30,8 @@ assert abs(t["total_ht"] + t["total_tva"] - t["total_ttc"]) < 0.01
 
 # Routes via test client
 client = appmod.app.test_client()
-for url in ["/", f"/devis/{row['id']}", f"/devis/{row['id']}/pdf", "/devis/nouveau"]:
+for url in ["/", "/devis", f"/devis/{row['id']}", f"/devis/{row['id']}/pdf",
+            "/devis/nouveau", "/profil", "/parametres"]:
     r = client.get(url)
     assert r.status_code == 200, f"{url} -> {r.status_code}"
     print(f"[OK] GET {url} -> 200 ({len(r.data)} octets)")

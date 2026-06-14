@@ -11,7 +11,7 @@
   <table class="data-table">
     <thead>
       <tr>
-        <th>Numero</th>
+        <th>Numéro</th>
         <th>Client</th>
         <th>Date</th>
         <th class="num">Total TTC</th>
@@ -22,7 +22,7 @@
     <tbody>
       {% for d in devis_list %}
       <tr>
-        <td data-label="Numero"><a href="{{ url_for('voir', devis_id=d.id) }}" class="link-strong">{{ d.numero }}</a></td>
+        <td data-label="Numéro"><a href="{{ url_for('voir', devis_id=d.id) }}" class="link-strong">{{ d.numero }}</a></td>
         <td data-label="Client">{{ d.client_nom }}<br><small class="muted">{{ d.nb_lignes }} prestation(s)</small></td>
         <td data-label="Date">{{ d.date_creation }}</td>
         <td data-label="Total TTC" class="num strong">{{ d.totaux.total_ttc | euro }}</td>
@@ -37,6 +37,10 @@
         </td>
         <td data-label="Actions" class="actions">
           <a href="{{ url_for('voir', devis_id=d.id) }}" class="btn btn-sm">Voir</a>
+          <a href="{{ url_for('modifier', devis_id=d.id) }}" class="btn btn-sm">Modifier</a>
+          <form method="post" action="{{ url_for('dupliquer', devis_id=d.id) }}" class="inline-form">
+            <button type="submit" class="btn btn-sm">Dupliquer</button>
+          </form>
           <a href="{{ url_for('pdf_devis', devis_id=d.id) }}" class="btn btn-sm" target="_blank">PDF</a>
         </td>
       </tr>
@@ -47,7 +51,7 @@
 {% else %}
 <div class="empty">
   <p>Aucun devis pour le moment.</p>
-  <a href="{{ url_for('nouveau') }}" class="btn btn-primary">Creer mon premier devis</a>
+  <a href="{{ url_for('nouveau') }}" class="btn btn-primary">Créer mon premier devis</a>
 </div>
 {% endif %}
 {% endblock %}

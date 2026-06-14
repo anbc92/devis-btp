@@ -14,10 +14,11 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     Flowable,
+    Image,
 )
 
 from calculs import calcul_totaux, ligne_total_ht, fmt_euro
-from config import ARTISAN, CONDITIONS
+from profil import get_profil, logo_fs_path
 
 # Charte graphique
 BLEU = colors.HexColor("#1f4e79")
@@ -44,6 +45,14 @@ class LogoPlaceholder(Flowable):
         c.drawCentredString(self.size / 2, self.size / 2 + 4, "LOGO")
         c.setFont("Helvetica", 6)
         c.drawCentredString(self.size / 2, self.size / 2 - 6, "placeholder")
+
+
+def _logo_flowable(prof, size=22 * mm):
+    """Renvoie le logo de l'artisan, sinon le placeholder."""
+    path = logo_fs_path(prof)
+    if path:
+        return Image(path, width=size, height=size, kind="proportional")
+    return LogoPlaceholder(size)
 
 
 def _styles():
@@ -90,15 +99,17 @@ def generer_pdf(devis, prestations):
         topMargin=16 * mm, bottomMargin=16 * mm,
         title=f"Devis {devis['numero']}",
     )
+    prof = get_profil()
     st = _styles()
     story = []
 
     # --- En-tete : logo + artisan a gauche, titre devis a droite ---
+    adresse_artisan = (prof["adresse"] or "").replace("\n", "<br/>")
     artisan_html = (
-        f"<b><font size=13 color='#1f4e79'>{ARTISAN['nom']}</font></b><br/>"
-        f"{ARTISAN['gerant']}<br/>"
-        f"{ARTISAN['adresse']}<br/>{ARTISAN['code_postal']} {ARTISAN['ville']}<br/>"
-        f"Tel : {ARTISAN['telephone']}<br/>{ARTISAN['email']}"
+        f"<b><font size=13 color='#1f4e79'>{prof['nom_entreprise']}</font></b><br/>"
+        f"{prof['gerant']}<br/>"
+        f"{adresse_artisan}<br/>"
+        f"Tel : {prof['telephone']}<br/>{prof['email']}"
     )
     titre_html = (
         f"<para alignment='right'><font size=20 color='#1f4e79'><b>DEVIS</b></font><br/>"
@@ -107,7 +118,7 @@ def generer_pdf(devis, prestations):
     )
     entete = Table(
         [[
-            Table([[LogoPlaceholder(), Paragraph(artisan_html, st["normal"])]],
+            Table([[_logo_flowable(prof), Paragraph(artisan_html, st["normal"])]],
                   colWidths=[26 * mm, 60 * mm],
                   style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
                                     ("LEFTPADDING", (1, 0), (1, 0), 6)])),
@@ -218,14 +229,14 @@ def generer_pdf(devis, prestations):
         story.append(Spacer(1, 6 * mm))
 
     # --- Conditions de paiement ---
-    acompte = round(totaux["total_ttc"] * CONDITIONS["acompte_pct"] / 100.0, 2)
+    acompte = round(totaux["total_ttc"] * prof["acompte_pct"] / 100.0, 2)
     cond_html = (
         f"<b>Conditions de paiement</b><br/>"
-        f"Validite du devis : {CONDITIONS['validite_jours']} jours.<br/>"
-        f"Acompte de {CONDITIONS['acompte_pct']} % a la commande, soit "
+        f"Validite du devis : {prof['validite_jours']} jours.<br/>"
+        f"Acompte de {prof['acompte_pct']} % a la commande, soit "
         f"{fmt_euro(acompte)}.<br/>"
-        f"{CONDITIONS['paiement']}<br/>"
-        f"IBAN : {ARTISAN['iban']}"
+        f"{prof['conditions_paiement']}<br/>"
+        f"IBAN : {prof['iban']}"
     )
     bloc_cond = Table([[Paragraph(cond_html, st["small"])]], colWidths=[174 * mm])
     bloc_cond.setStyle(TableStyle([
@@ -253,21 +264,26 @@ def generer_pdf(devis, prestations):
     ]))
     story.append(accord)
 
-    doc.build(story, onFirstPage=_pied, onLaterPages=_pied)
+    pied = _make_pied(prof)
+    doc.build(story, onFirstPage=pied, onLaterPages=pied)
     buf.seek(0)
     return buf
 
 
-def _pied(canvas, doc):
-    """Pied de page : mentions legales de l'artisan."""
-    canvas.saveState()
-    canvas.setFont("Helvetica", 7)
-    canvas.setFillColor(GRIS)
-    pied = (
-        f"{ARTISAN['nom']} - SIRET {ARTISAN['siret']} - "
-        f"TVA {ARTISAN['tva_intra']} - APE {ARTISAN['ape']} - "
-        f"{ARTISAN['adresse']}, {ARTISAN['code_postal']} {ARTISAN['ville']}"
-    )
-    canvas.drawCentredString(A4[0] / 2, 10 * mm, pied)
-    canvas.drawCentredString(A4[0] / 2, 6 * mm, CONDITIONS["mentions"][:120])
-    canvas.restoreState()
+def _make_pied(prof):
+    """Construit le callback de pied de page (mentions legales de l'artisan)."""
+    adresse_ligne = (prof["adresse"] or "").replace("\n", ", ")
+
+    def _pied(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(GRIS)
+        ligne = (
+            f"{prof['nom_entreprise']} - SIRET {prof['siret']} - "
+            f"TVA {prof['tva_intra']} - APE {prof['ape']} - {adresse_ligne}"
+        )
+        canvas.drawCentredString(A4[0] / 2, 10 * mm, ligne)
+        canvas.drawCentredString(A4[0] / 2, 6 * mm, prof["mentions"][:120])
+        canvas.restoreState()
+
+    return _pied

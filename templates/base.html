@@ -11,9 +11,13 @@
     <div class="container topbar-inner">
       <a href="{{ url_for('index') }}" class="brand">
         <span class="logo">BTP</span>
-        <span>{{ ARTISAN.nom }} <small>&middot; Devis</small></span>
+        <span>{{ profil.nom_entreprise }} <small>&middot; Devis</small></span>
       </a>
-      <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
+      <div class="topbar-actions">
+        <a href="{{ url_for('parametres') }}" class="btn btn-light">Paramètres</a>
+        <a href="{{ url_for('profil') }}" class="btn btn-light">Mon profil &#9881;&#65039;</a>
+        <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
+      </div>
     </div>
   </header>
 
@@ -28,8 +32,8 @@
 
   <footer class="footer">
     <div class="container">
-      {{ ARTISAN.nom }} &middot; SIRET {{ ARTISAN.siret }} &middot;
-      {{ ARTISAN.telephone }} &middot; {{ ARTISAN.email }}
+      {{ profil.nom_entreprise }} &middot; SIRET {{ profil.siret }} &middot;
+      {{ profil.telephone }} &middot; {{ profil.email }}
     </div>
   </footer>
   {% block scripts %}{% endblock %}

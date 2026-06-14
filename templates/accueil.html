@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevisBTP - Créez vos devis BTP en 2 minutes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="{{ url_for('accueil') }}" class="brand">
+        <span class="logo">BTP</span>
+        <span>DevisBTP</span>
+      </a>
+      <a href="{{ url_for('index') }}" class="btn btn-primary">Accéder à mes devis</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="hero-title">Créez vos devis BTP en 2 minutes</h1>
+        <p class="hero-subtitle">Simple, rapide et professionnel</p>
+        <a href="{{ url_for('nouveau') }}" class="btn btn-primary btn-cta">Créer mon premier devis</a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="container section">
+      <div class="features">
+        <div class="card feature-card">
+          <div class="feature-icon">&#9889;</div>
+          <h2>Rapide</h2>
+          <p class="muted">Un devis complet prêt à envoyer en quelques clics.</p>
+        </div>
+        <div class="card feature-card">
+          <div class="feature-icon">&#128196;</div>
+          <h2>PDF Pro</h2>
+          <p class="muted">Des PDF soignés à votre image, avec votre logo.</p>
+        </div>
+        <div class="card feature-card">
+          <div class="feature-icon">&#9989;</div>
+          <h2>Suivi facile</h2>
+          <p class="muted">Brouillon, envoyé, accepté : suivez chaque devis.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comment ça marche -->
+    <section class="container section">
+      <h2 class="section-title">Comment ça marche</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Remplis les infos client</h3>
+          <p class="muted">Nom, adresse et email du client.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Ajoute tes prestations</h3>
+          <p class="muted">Désignations, quantités, prix et TVA.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Génère et envoie le PDF</h3>
+          <p class="muted">Télécharge ou imprime ton devis pro.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">DevisBTP</div>
+  </footer>
+</body>
+</html>

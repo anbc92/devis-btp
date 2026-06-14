@@ -1,12 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Nouveau devis{% endblock %}
+{% set is_edit = (mode == 'modifier') %}
+{% block title %}{{ 'Modifier le devis' if is_edit else 'Nouveau devis' }}{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>Nouveau devis</h1>
-  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour</a>
+  <h1>{{ 'Modifier le devis' if is_edit else 'Nouveau devis' }}</h1>
+  <a href="{{ url_for('voir', devis_id=devis_id) if is_edit else url_for('index') }}" class="link-back">&larr; Retour</a>
 </div>
 
-<form method="post" class="card" id="devis-form">
+<form method="post"
+      action="{{ url_for('modifier', devis_id=devis_id) if is_edit else url_for('nouveau') }}"
+      class="card" id="devis-form">
   <section class="form-section">
     <h2>Client</h2>
     <div class="grid-2">
@@ -34,8 +37,8 @@
       <table class="lignes-table" id="lignes-table">
         <thead>
           <tr>
-            <th class="col-des">Designation</th>
-            <th class="col-qte">Qte</th>
+            <th class="col-des">Désignation</th>
+            <th class="col-qte">Qté</th>
             <th class="col-pu">P.U. HT</th>
             <th class="col-tva">TVA</th>
             <th class="col-tot num">Total HT</th>
@@ -53,7 +56,7 @@
   <section class="form-section">
     <h2>Notes (optionnel)</h2>
     <div class="field">
-      <textarea name="notes" rows="2" placeholder="Informations complementaires, details du chantier...">{{ form.notes or '' }}</textarea>
+      <textarea name="notes" rows="2" placeholder="Informations complémentaires, détails du chantier...">{{ form.notes or '' }}</textarea>
     </div>
   </section>
 
@@ -64,15 +67,15 @@
   </div>
 
   <div class="form-actions">
-    <a href="{{ url_for('index') }}" class="btn btn-light">Annuler</a>
-    <button type="submit" class="btn btn-primary">Enregistrer le devis</button>
+    <a href="{{ url_for('voir', devis_id=devis_id) if is_edit else url_for('index') }}" class="btn btn-light">Annuler</a>
+    <button type="submit" class="btn btn-primary">{{ 'Enregistrer les modifications' if is_edit else 'Enregistrer le devis' }}</button>
   </div>
 </form>
 
 <template id="ligne-template">
   <tr class="ligne">
-    <td data-label="Designation"><input type="text" name="designation[]" placeholder="Ex : Pose carrelage 60x60"></td>
-    <td data-label="Qte"><input type="text" inputmode="decimal" name="quantite[]" class="qte" value="1"></td>
+    <td data-label="Désignation"><input type="text" name="designation[]" placeholder="Ex : Pose carrelage 60x60"></td>
+    <td data-label="Qté"><input type="text" inputmode="decimal" name="quantite[]" class="qte" value="1"></td>
     <td data-label="P.U. HT"><input type="text" inputmode="decimal" name="prix_unitaire[]" class="pu" value="0"></td>
     <td data-label="TVA">
       <select name="tva_taux[]" class="tva">
@@ -86,6 +89,9 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  window.EXISTING_LIGNES = {{ (prestations or []) | tojson }};
+</script>
 <script>
   const body = document.getElementById('lignes-body');
   const tpl = document.getElementById('ligne-template');
@@ -111,8 +117,18 @@
     document.getElementById('tp-tva').textContent = fmtEuro(tva);
     document.getElementById('tp-ttc').textContent = fmtEuro(ht + tva);
   }
-  function addLigne() {
+  function addLigne(data) {
     body.appendChild(tpl.content.cloneNode(true));
+    if (data) {
+      const tr = body.lastElementChild;
+      tr.querySelector('[name="designation[]"]').value = data.designation || '';
+      tr.querySelector('.qte').value = data.quantite;
+      tr.querySelector('.pu').value = data.prix_unitaire;
+      const tvaSel = tr.querySelector('.tva');
+      Array.from(tvaSel.options).forEach(o => {
+        if (parseFloat(o.value) === parseFloat(data.tva_taux)) tvaSel.value = o.value;
+      });
+    }
     recalc();
   }
   body.addEventListener('input', recalc);
@@ -123,9 +139,14 @@
       recalc();
     }
   });
-  document.getElementById('add-ligne').addEventListener('click', addLigne);
+  document.getElementById('add-ligne').addEventListener('click', () => addLigne());
 
-  // Au moins une ligne au chargement
-  addLigne();
+  // Pre-remplit les prestations existantes, sinon une ligne vide
+  const existing = window.EXISTING_LIGNES || [];
+  if (existing.length) {
+    existing.forEach(addLigne);
+  } else {
+    addLigne();
+  }
 </script>
 {% endblock %}

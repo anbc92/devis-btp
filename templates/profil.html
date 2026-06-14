@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Mon profil{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Mon profil</h1>
+  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour</a>
+</div>
+
+<p class="muted">Ces informations apparaissent sur l'en-tête et le pied de vos devis PDF.</p>
+
+<form method="post" action="{{ url_for('profil') }}" class="card" enctype="multipart/form-data">
+  <section class="form-section">
+    <h2>Entreprise</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="nom_entreprise">Nom de l'entreprise <span class="req">*</span></label>
+        <input type="text" id="nom_entreprise" name="nom_entreprise" required
+               value="{{ form.nom_entreprise or '' }}" placeholder="BTP Renov Pro">
+      </div>
+      <div class="field">
+        <label for="gerant">Nom et prénom du gérant</label>
+        <input type="text" id="gerant" name="gerant"
+               value="{{ form.gerant or '' }}" placeholder="Jean Dupont">
+      </div>
+    </div>
+    <div class="field">
+      <label for="adresse">Adresse</label>
+      <textarea id="adresse" name="adresse" rows="2"
+                placeholder="N&deg; et rue&#10;Code postal et ville">{{ form.adresse or '' }}</textarea>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="telephone">Téléphone</label>
+        <input type="text" id="telephone" name="telephone"
+               value="{{ form.telephone or '' }}" placeholder="01 23 45 67 89">
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email"
+               value="{{ form.email or '' }}" placeholder="contact@entreprise.fr">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="siret">SIRET</label>
+        <input type="text" id="siret" name="siret"
+               value="{{ form.siret or '' }}" placeholder="123 456 789 00012">
+      </div>
+      <div class="field">
+        <label for="iban">IBAN</label>
+        <input type="text" id="iban" name="iban"
+               value="{{ form.iban or '' }}" placeholder="FR76 ...">
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Conditions de paiement</h2>
+    <div class="field">
+      <textarea name="conditions_paiement" rows="2"
+                placeholder="Solde à la livraison. Règlement par chèque ou virement bancaire.">{{ form.conditions_paiement or '' }}</textarea>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Logo</h2>
+    {% if form.logo_path %}
+    <div class="logo-preview">
+      <img src="{{ url_for('static', filename=form.logo_path) }}?v={{ range(100000)|random }}"
+           alt="Logo actuel" style="max-height:80px;max-width:200px;">
+      <p class="muted">Logo actuel &mdash; envoyez un nouveau fichier pour le remplacer.</p>
+    </div>
+    {% endif %}
+    <div class="field">
+      <label for="logo">Image (PNG ou JPG, 2 Mo maximum)</label>
+      <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <a href="{{ url_for('index') }}" class="btn btn-light">Annuler</a>
+    <button type="submit" class="btn btn-primary">Enregistrer le profil</button>
+  </div>
+</form>
+{% endblock %}

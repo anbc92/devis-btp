@@ -4,13 +4,18 @@
 <div class="page-head">
   <div>
     <h1>{{ devis.numero }}</h1>
-    <p class="muted">Cree le {{ devis.date_creation }}</p>
+    <p class="muted">Créé le {{ devis.date_creation }}</p>
   </div>
-  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour a la liste</a>
+  <a href="{{ url_for('index') }}" class="link-back">&larr; Retour à la liste</a>
 </div>
 
 <div class="toolbar">
-  <a href="{{ url_for('pdf_devis', devis_id=devis.id) }}" class="btn btn-primary" target="_blank">Telecharger / Imprimer le PDF</a>
+  <a href="{{ url_for('pdf_devis', devis_id=devis.id) }}" class="btn btn-primary" target="_blank">Télécharger / Imprimer le PDF</a>
+  <button type="button" class="btn" id="open-mail">Envoyer par mail</button>
+  <a href="{{ url_for('modifier', devis_id=devis.id) }}" class="btn">Modifier</a>
+  <form method="post" action="{{ url_for('dupliquer', devis_id=devis.id) }}" class="inline-form">
+    <button type="submit" class="btn">Dupliquer</button>
+  </form>
   <form method="post" action="{{ url_for('changer_statut', devis_id=devis.id) }}" class="statut-form">
     <label class="muted">Statut :</label>
     <select name="statut" class="statut-select statut-{{ devis.statut }}" onchange="this.form.submit()">
@@ -20,7 +25,7 @@
     </select>
   </form>
   <form method="post" action="{{ url_for('supprimer', devis_id=devis.id) }}"
-        onsubmit="return confirm('Supprimer definitivement ce devis ?');" class="ml-auto">
+        onsubmit="return confirm('Supprimer définitivement ce devis ?');" class="ml-auto">
     <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
   </form>
 </div>
@@ -37,8 +42,8 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Designation</th>
-          <th class="num">Qte</th>
+          <th>Désignation</th>
+          <th class="num">Qté</th>
           <th class="num">P.U. HT</th>
           <th class="num">TVA</th>
           <th class="num">Total HT</th>
@@ -47,8 +52,8 @@
       <tbody>
         {% for p in prestations %}
         <tr>
-          <td data-label="Designation">{{ p.designation }}</td>
-          <td data-label="Qte" class="num">{{ '%g'|format(p.quantite) }}</td>
+          <td data-label="Désignation">{{ p.designation }}</td>
+          <td data-label="Qté" class="num">{{ '%g'|format(p.quantite) }}</td>
           <td data-label="P.U. HT" class="num">{{ p.prix_unitaire | euro }}</td>
           <td data-label="TVA" class="num">{{ '%g'|format(p.tva_taux) }} %</td>
           <td data-label="Total HT" class="num strong">{{ p.total_ht | euro }}</td>
@@ -73,4 +78,68 @@
   </div>
   {% endif %}
 </div>
+
+<!-- Modale envoi par mail -->
+<div class="modal-overlay" id="mail-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mail-titre">
+    <div class="modal-head">
+      <h2 id="mail-titre">Envoyer le devis par mail</h2>
+      <button type="button" class="modal-close" data-close aria-label="Fermer">&times;</button>
+    </div>
+
+    {% if not smtp_ok %}
+    <div class="flash flash-error">
+      Configuration SMTP incomplète &mdash;
+      <a href="{{ url_for('parametres') }}">configurez vos paramètres d'envoi</a>.
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('envoyer', devis_id=devis.id) }}">
+      <div class="field">
+        <label for="destinataire">E-mail du destinataire <span class="req">*</span></label>
+        <input type="email" id="destinataire" name="destinataire" required
+               value="{{ devis.client_email or '' }}" placeholder="client@email.fr">
+      </div>
+      <div class="field">
+        <label for="objet">Objet</label>
+        <input type="text" id="objet" name="objet"
+               value="Devis N&deg; {{ devis.numero }}">
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="9">Bonjour{% if devis.client_nom %} {{ devis.client_nom }}{% endif %},
+
+Veuillez trouver ci-joint notre devis N&deg; {{ devis.numero }}.
+
+Nous restons à votre disposition pour toute information complémentaire.
+
+Cordialement,
+{{ profil.nom_entreprise }}</textarea>
+      </div>
+      <p class="muted">Le PDF du devis ({{ devis.numero }}.pdf) sera joint automatiquement.</p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-light" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Envoyer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const mailModal = document.getElementById('mail-modal');
+  document.getElementById('open-mail').addEventListener('click', () => {
+    mailModal.hidden = false;
+    document.getElementById('destinataire').focus();
+  });
+  mailModal.addEventListener('click', (e) => {
+    if (e.target === mailModal || e.target.hasAttribute('data-close')) {
+      mailModal.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') mailModal.hidden = true;
+  });
+</script>
 {% endblock %}
