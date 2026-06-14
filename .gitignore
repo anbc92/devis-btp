@@ -1,3 +1,6 @@
+# Secrets / configuration locale
+.env
+
 # Base de donnees SQLite (donnees locales, ne pas versionner)
 devis.db
 *.db

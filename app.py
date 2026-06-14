@@ -5,12 +5,16 @@ from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
 
+from dotenv import load_dotenv
 from PIL import Image, UnidentifiedImageError
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import (
     Flask, render_template, request, redirect, url_for, send_file, abort,
     flash, session,
 )
+
+# Charge les variables d'environnement depuis le fichier .env (si present).
+load_dotenv()
 
 from db import get_db, init_db
 from calculs import calcul_totaux, ligne_total_ht, fmt_euro
