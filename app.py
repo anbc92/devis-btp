@@ -1,5 +1,6 @@
 """Application web de generation de devis pour artisans BTP (V1)."""
 
+import os
 from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
@@ -22,7 +23,9 @@ from mail import envoyer_devis, config_smtp_ok, debug_config_smtp, MailError
 from config import ARTISAN, CONDITIONS, TAUX_TVA, STATUTS
 
 app = Flask(__name__)
-app.secret_key = "devis-btp-v1-change-me"
+# Cle secrete des sessions : depuis l'environnement en production.
+# La valeur de repli ne sert qu'au developpement local.
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 # Cree les tables manquantes (dont users/profil) au demarrage, quel que soit
 # le mode de lancement (python app.py, flask run, serveur WSGI...).
