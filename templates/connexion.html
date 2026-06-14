@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <h1>Connexion</h1>
+    <p class="muted">Accédez à vos devis.</p>
+    <form method="post" action="{{ url_for('connexion') }}">
+      <div class="field">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" required
+               value="{{ form.email or '' }}" placeholder="vous@entreprise.fr">
+      </div>
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" name="password" required
+               autocomplete="current-password">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Se connecter</button>
+      </div>
+    </form>
+    <p class="muted auth-alt">
+      Pas encore de compte ?
+      <a href="{{ url_for('inscription') }}">Créer un compte</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

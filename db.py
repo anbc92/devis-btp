@@ -13,6 +13,37 @@ def get_db():
     return conn
 
 
+# Schema de la table profil (rattachee a un utilisateur via user_id).
+PROFIL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS profil (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER UNIQUE,
+    nom_entreprise       TEXT NOT NULL DEFAULT '',
+    gerant               TEXT NOT NULL DEFAULT '',
+    adresse              TEXT NOT NULL DEFAULT '',
+    telephone            TEXT NOT NULL DEFAULT '',
+    email                TEXT NOT NULL DEFAULT '',
+    siret                TEXT NOT NULL DEFAULT '',
+    iban                 TEXT NOT NULL DEFAULT '',
+    conditions_paiement  TEXT NOT NULL DEFAULT '',
+    logo_path            TEXT NOT NULL DEFAULT '',
+    mail_server          TEXT NOT NULL DEFAULT '',
+    mail_port            TEXT NOT NULL DEFAULT '',
+    mail_username        TEXT NOT NULL DEFAULT '',
+    mail_password        TEXT NOT NULL DEFAULT '',
+    mail_from            TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
+# Colonnes de profil susceptibles d'etre copiees lors d'une migration.
+_PROFIL_COLONNES = [
+    "nom_entreprise", "gerant", "adresse", "telephone", "email", "siret",
+    "iban", "conditions_paiement", "logo_path", "mail_server", "mail_port",
+    "mail_username", "mail_password", "mail_from",
+]
+
+
 def init_db():
     conn = get_db()
     conn.executescript(
@@ -39,37 +70,51 @@ def init_db():
             FOREIGN KEY (devis_id) REFERENCES devis(id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS profil (
-            id                   INTEGER PRIMARY KEY CHECK (id = 1),
-            nom_entreprise       TEXT NOT NULL DEFAULT '',
-            gerant               TEXT NOT NULL DEFAULT '',
-            adresse              TEXT NOT NULL DEFAULT '',
-            telephone            TEXT NOT NULL DEFAULT '',
-            email                TEXT NOT NULL DEFAULT '',
-            siret                TEXT NOT NULL DEFAULT '',
-            iban                 TEXT NOT NULL DEFAULT '',
-            conditions_paiement  TEXT NOT NULL DEFAULT '',
-            logo_path            TEXT NOT NULL DEFAULT '',
-            mail_server          TEXT NOT NULL DEFAULT '',
-            mail_port            TEXT NOT NULL DEFAULT '',
-            mail_username        TEXT NOT NULL DEFAULT '',
-            mail_password        TEXT NOT NULL DEFAULT '',
-            mail_from            TEXT NOT NULL DEFAULT ''
+        CREATE TABLE IF NOT EXISTS users (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            email           TEXT    NOT NULL UNIQUE,
+            password_hash   TEXT    NOT NULL,
+            nom_entreprise  TEXT    NOT NULL DEFAULT '',
+            created_at      TEXT    NOT NULL DEFAULT ''
         );
         """
     )
 
-    # Migration : ajoute les colonnes SMTP aux bases profil deja existantes.
-    _ensure_columns(conn, "profil", {
-        "mail_server": "TEXT NOT NULL DEFAULT ''",
-        "mail_port": "TEXT NOT NULL DEFAULT ''",
-        "mail_username": "TEXT NOT NULL DEFAULT ''",
-        "mail_password": "TEXT NOT NULL DEFAULT ''",
-        "mail_from": "TEXT NOT NULL DEFAULT ''",
-    })
+    # Profil : creation (nouveau schema) ou migration depuis l'ancien (id=1).
+    _migrer_profil(conn)
+
+    # Migration douce : colonne user_id sur devis (les anciens devis -> NULL).
+    _ensure_columns(conn, "devis", {"user_id": "INTEGER"})
 
     conn.commit()
     conn.close()
+
+
+def _migrer_profil(conn):
+    """Cree la table profil au nouveau schema, ou migre l'ancien (sans user_id).
+
+    L'ancienne ligne unique (id=1) est conservee en tant que profil "legacy"
+    (user_id NULL) : aucune donnee n'est perdue.
+    """
+    colonnes = {r["name"] for r in conn.execute("PRAGMA table_info(profil)")}
+
+    if not colonnes:
+        conn.executescript(PROFIL_SCHEMA)
+        return
+    if "user_id" in colonnes:
+        return  # deja au nouveau schema
+
+    # Ancien schema -> reconstruction en preservant les donnees existantes.
+    conn.execute("ALTER TABLE profil RENAME TO profil_old")
+    conn.executescript(PROFIL_SCHEMA)
+    communes = [c for c in _PROFIL_COLONNES if c in colonnes]
+    if communes:
+        liste = ", ".join(communes)
+        conn.execute(
+            f"INSERT INTO profil (user_id, {liste}) "
+            f"SELECT NULL, {liste} FROM profil_old"
+        )
+    conn.execute("DROP TABLE profil_old")
 
 
 def _ensure_columns(conn, table, colonnes):

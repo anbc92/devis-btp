@@ -179,6 +179,15 @@ textarea { resize: vertical; }
   .features, .steps { grid-template-columns: 1fr; }
 }
 
+/* Auth (connexion / inscription) */
+.auth-wrap { max-width: 420px; margin: 48px auto; }
+.auth-card { padding: 28px; }
+.auth-card h1 { margin-bottom: 4px; }
+.auth-card .form-actions { justify-content: stretch; }
+.auth-card .form-actions .btn { width: 100%; justify-content: center; }
+.auth-alt { margin-top: 16px; text-align: center; }
+.user-email { color: var(--gris); font-size: .85rem; padding: 0 4px; }
+
 /* Modale */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 50;

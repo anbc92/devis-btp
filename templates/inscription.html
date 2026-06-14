@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Inscription{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <h1>Créer un compte</h1>
+    <p class="muted">Quelques secondes suffisent.</p>
+    <form method="post" action="{{ url_for('inscription') }}">
+      <div class="field">
+        <label for="nom_entreprise">Nom de l'entreprise <span class="req">*</span></label>
+        <input type="text" id="nom_entreprise" name="nom_entreprise" required
+               value="{{ form.nom_entreprise or '' }}" placeholder="BTP Renov Pro">
+      </div>
+      <div class="field">
+        <label for="email">E-mail <span class="req">*</span></label>
+        <input type="email" id="email" name="email" required
+               value="{{ form.email or '' }}" placeholder="vous@entreprise.fr">
+      </div>
+      <div class="field">
+        <label for="password">Mot de passe <span class="req">*</span></label>
+        <input type="password" id="password" name="password" required
+               autocomplete="new-password" placeholder="6 caractères minimum">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Créer mon compte</button>
+      </div>
+    </form>
+    <p class="muted auth-alt">
+      Déjà un compte ?
+      <a href="{{ url_for('connexion') }}">Se connecter</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

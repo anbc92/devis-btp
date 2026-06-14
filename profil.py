@@ -32,7 +32,11 @@ _SMTP_ENV = {
 }
 
 STATIC_DIR = Path(__file__).parent / "static"
-LOGO_REL = "uploads/logo.png"  # chemin relatif a /static
+
+
+def logo_rel(user_id):
+    """Chemin relatif (a /static) du logo d'un utilisateur."""
+    return f"uploads/logo_{user_id}.png"
 
 
 def _defauts():
@@ -50,16 +54,28 @@ def _defauts():
     }
 
 
-def get_profil():
-    """Renvoie le profil complet (base + defauts config) sous forme de dict.
+def _ligne_profil(user_id):
+    """Ligne brute de profil pour un utilisateur (ou profil legacy si None)."""
+    conn = get_db()
+    if user_id is None:
+        row = conn.execute(
+            "SELECT * FROM profil WHERE user_id IS NULL ORDER BY id LIMIT 1"
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT * FROM profil WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    conn.close()
+    return dict(row) if row else {}
+
+
+def get_profil(user_id=None):
+    """Renvoie le profil complet (base + defauts config) pour un utilisateur.
 
     Inclut aussi les champs non editables encore lus depuis config.py
     (tva_intra, ape, validite_jours, acompte_pct, mentions).
     """
-    conn = get_db()
-    row = conn.execute("SELECT * FROM profil WHERE id = 1").fetchone()
-    conn.close()
-    data = dict(row) if row else {}
+    data = _ligne_profil(user_id)
 
     for cle, defaut in _defauts().items():
         valeur = data.get(cle)
@@ -82,22 +98,24 @@ def get_profil():
     return data
 
 
-def save_profil(valeurs, logo_path=None):
-    """Enregistre (upsert) le profil. `valeurs` : mapping des CHAMPS_PROFIL.
+def save_profil(user_id, valeurs, logo_path=None):
+    """Enregistre (upsert) le profil de `user_id`. `valeurs` : CHAMPS_PROFIL.
 
     Si `logo_path` est fourni (chemin relatif), il est mis a jour ; sinon
     le logo existant est conserve.
     """
     conn = get_db()
-    row = conn.execute("SELECT logo_path FROM profil WHERE id = 1").fetchone()
+    row = conn.execute(
+        "SELECT logo_path FROM profil WHERE user_id = ?", (user_id,)
+    ).fetchone()
     logo = logo_path if logo_path is not None else (row["logo_path"] if row else "")
     conn.execute(
         """
-        INSERT INTO profil (id, nom_entreprise, gerant, adresse, telephone,
+        INSERT INTO profil (user_id, nom_entreprise, gerant, adresse, telephone,
                             email, siret, iban, conditions_paiement, logo_path)
-        VALUES (1, :nom_entreprise, :gerant, :adresse, :telephone, :email,
+        VALUES (:user_id, :nom_entreprise, :gerant, :adresse, :telephone, :email,
                 :siret, :iban, :conditions_paiement, :logo_path)
-        ON CONFLICT(id) DO UPDATE SET
+        ON CONFLICT(user_id) DO UPDATE SET
             nom_entreprise = excluded.nom_entreprise,
             gerant = excluded.gerant,
             adresse = excluded.adresse,
@@ -109,43 +127,38 @@ def save_profil(valeurs, logo_path=None):
             logo_path = excluded.logo_path
         """,
         {**{c: (valeurs.get(c) or "").strip() for c in CHAMPS_PROFIL},
-         "logo_path": logo},
+         "user_id": user_id, "logo_path": logo},
     )
     conn.commit()
     conn.close()
 
 
-def get_profil_raw():
-    """Renvoie les valeurs BRUTES stockees en base (sans fusion/defaut/env).
-
-    Utile pour diagnostiquer ce qui est reellement enregistre.
-    """
-    conn = get_db()
-    row = conn.execute("SELECT * FROM profil WHERE id = 1").fetchone()
-    conn.close()
-    return dict(row) if row else {}
+def get_profil_raw(user_id=None):
+    """Renvoie les valeurs BRUTES en base (sans fusion/defaut/env), pour debug."""
+    return _ligne_profil(user_id)
 
 
-def save_smtp(valeurs):
-    """Enregistre (upsert) la config SMTP. `valeurs` : mapping des CHAMPS_SMTP.
+def save_smtp(user_id, valeurs):
+    """Enregistre (upsert) la config SMTP de `user_id`. `valeurs` : CHAMPS_SMTP.
 
-    Ne touche pas aux autres colonnes du profil (en cas de conflit sur id=1).
+    Ne touche pas aux autres colonnes du profil.
     """
     conn = get_db()
     conn.execute(
         """
-        INSERT INTO profil (id, mail_server, mail_port, mail_username,
+        INSERT INTO profil (user_id, mail_server, mail_port, mail_username,
                             mail_password, mail_from)
-        VALUES (1, :mail_server, :mail_port, :mail_username, :mail_password,
-                :mail_from)
-        ON CONFLICT(id) DO UPDATE SET
+        VALUES (:user_id, :mail_server, :mail_port, :mail_username,
+                :mail_password, :mail_from)
+        ON CONFLICT(user_id) DO UPDATE SET
             mail_server = excluded.mail_server,
             mail_port = excluded.mail_port,
             mail_username = excluded.mail_username,
             mail_password = excluded.mail_password,
             mail_from = excluded.mail_from
         """,
-        {c: (valeurs.get(c) or "").strip() for c in CHAMPS_SMTP},
+        {**{c: (valeurs.get(c) or "").strip() for c in CHAMPS_SMTP},
+         "user_id": user_id},
     )
     conn.commit()
     conn.close()

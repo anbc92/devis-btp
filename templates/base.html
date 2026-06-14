@@ -9,14 +9,21 @@
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
-      <a href="{{ url_for('index') }}" class="brand">
+      <a href="{{ url_for('index') if session.user_id else url_for('accueil') }}" class="brand">
         <span class="logo">BTP</span>
         <span>{{ profil.nom_entreprise }} <small>&middot; Devis</small></span>
       </a>
       <div class="topbar-actions">
+        {% if session.user_id %}
         <a href="{{ url_for('parametres') }}" class="btn btn-light">Paramètres</a>
         <a href="{{ url_for('profil') }}" class="btn btn-light">Mon profil &#9881;&#65039;</a>
         <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
+        <span class="user-email" title="Connecté">{{ session.email }}</span>
+        <a href="{{ url_for('deconnexion') }}" class="btn btn-light">Déconnexion</a>
+        {% else %}
+        <a href="{{ url_for('connexion') }}" class="btn btn-light">Connexion</a>
+        <a href="{{ url_for('inscription') }}" class="btn btn-primary">Inscription</a>
+        {% endif %}
       </div>
     </div>
   </header>

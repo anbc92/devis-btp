@@ -13,7 +13,14 @@
         <span class="logo">BTP</span>
         <span>DevisBTP</span>
       </a>
+      {% if session.user_id %}
       <a href="{{ url_for('index') }}" class="btn btn-primary">Accéder à mes devis</a>
+      {% else %}
+      <span class="topbar-actions">
+        <a href="{{ url_for('connexion') }}" class="btn btn-light">Connexion</a>
+        <a href="{{ url_for('inscription') }}" class="btn btn-primary">Inscription</a>
+      </span>
+      {% endif %}
     </div>
   </header>
 
