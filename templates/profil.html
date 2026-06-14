@@ -9,6 +9,7 @@
 <p class="muted">Ces informations apparaissent sur l'en-tête et le pied de vos devis PDF.</p>
 
 <form method="post" action="{{ url_for('profil') }}" class="card" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="form-section">
     <h2>Entreprise</h2>
     <div class="grid-2">

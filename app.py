@@ -12,6 +12,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, send_file, abort,
     flash, session,
 )
+from flask_wtf import CSRFProtect
 
 # Charge les variables d'environnement depuis le fichier .env (si present).
 load_dotenv()
@@ -20,20 +21,55 @@ from db import get_db, init_db
 from calculs import calcul_totaux, ligne_total_ht, fmt_euro
 from pdf import generer_pdf
 from profil import (
-    get_profil, get_profil_raw, save_profil, save_smtp, logo_rel,
+    get_profil, save_profil, save_smtp, logo_rel,
     CHAMPS_PROFIL, CHAMPS_SMTP,
 )
-from mail import envoyer_devis, config_smtp_ok, debug_config_smtp, MailError
+from mail import envoyer_devis, config_smtp_ok, MailError
 from config import ARTISAN, CONDITIONS, TAUX_TVA, STATUTS
+
+
+def _flag_env(nom, defaut=False):
+    """Lit un booleen depuis une variable d'environnement."""
+    return os.environ.get(nom, str(defaut)).lower() in ("1", "true", "yes", "on")
+
 
 app = Flask(__name__)
 # Cle secrete des sessions : depuis l'environnement en production.
 # La valeur de repli ne sert qu'au developpement local.
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
+# Securite des cookies de session
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # Mettre SESSION_COOKIE_SECURE=1 en production (HTTPS obligatoire).
+    SESSION_COOKIE_SECURE=_flag_env("SESSION_COOKIE_SECURE"),
+)
+
+# Protection CSRF sur toutes les requetes mutantes (POST/PUT/PATCH/DELETE).
+csrf = CSRFProtect(app)
+
 # Cree les tables manquantes (dont users/profil) au demarrage, quel que soit
 # le mode de lancement (python app.py, flask run, serveur WSGI...).
 init_db()
+
+
+@app.after_request
+def _entetes_securite(response):
+    """Ajoute des en-tetes de securite a toutes les reponses."""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; "
+        "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "frame-ancestors 'none'",
+    )
+    if request.is_secure:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 # Upload logo
 UPLOAD_DIR = Path(app.static_folder) / "uploads"
@@ -96,10 +132,19 @@ def _charger_prestations(devis_id, conn):
 
 
 def _generer_numero(conn):
-    """Numero de devis : DEV-AAAA-NNNN (annee courante, sequence globale)."""
+    """Numero de devis : DEV-AAAA-NNNN via un compteur atomique par annee.
+
+    Le compteur est monotone (jamais decremente) : aucune collision possible,
+    meme apres suppression de devis ou en cas de creations concurrentes.
+    """
     annee = date.today().year
-    n = conn.execute("SELECT COUNT(*) AS c FROM devis").fetchone()["c"] + 1
-    return f"DEV-{annee}-{n:04d}"
+    row = conn.execute(
+        "INSERT INTO compteurs (annee, dernier) VALUES (?, 1) "
+        "ON CONFLICT(annee) DO UPDATE SET dernier = dernier + 1 "
+        "RETURNING dernier",
+        (annee,),
+    ).fetchone()
+    return f"DEV-{annee}-{row['dernier']:04d}"
 
 
 def _parse_lignes(form):
@@ -312,14 +357,7 @@ def envoyer(devis_id):
     objet = request.form.get("objet", "").strip() or f"Devis {devis['numero']}"
     message = request.form.get("message", "").strip()
 
-    # --- DEBUG : valeurs SMTP lues a la tentative d'envoi ---
     prof = get_profil(current_user_id())
-    debug_config_smtp(get_profil_raw(current_user_id()),
-                      f"valeurs BRUTES en base (devis {devis['numero']})")
-    debug_config_smtp(prof,
-                      f"valeurs RESOLUES base+env (devis {devis['numero']})")
-    app.logger.warning("  destinataire saisi = %r", destinataire)
-
     pdf_buf = generer_pdf(devis, prestations)
     try:
         envoyer_devis(prof, destinataire, objet, message,
@@ -535,22 +573,8 @@ def profil():
 def parametres():
     uid = current_user_id()
     if request.method == "POST":
-        # --- DEBUG : que recoit-on reellement du formulaire ? ---
-        app.logger.warning("---- POST /parametres ----")
-        app.logger.warning("  Content-Type : %s", request.content_type)
-        app.logger.warning("  request.form (toutes cles) : %s",
-                           dict(request.form))
-        for c in CHAMPS_SMTP:
-            app.logger.warning("  form[%s] = %r", c, request.form.get(c))
-
         valeurs = {c: request.form.get(c, "") for c in CHAMPS_SMTP}
         save_smtp(uid, valeurs)
-
-        # Relecture immediate pour confirmer la persistance en base.
-        apres = {k: v for k, v in get_profil_raw(uid).items()
-                 if k.startswith("mail_")}
-        app.logger.warning("  -> valeurs en base apres save : %s", apres)
-
         flash("Paramètres SMTP enregistrés.", "ok")
         return redirect(url_for("parametres"))
 
@@ -559,4 +583,10 @@ def parametres():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Defauts surs : ecoute locale, debugger desactive. Surchargeables via env.
+    # (NE JAMAIS activer FLASK_DEBUG en production : RCE via le debugger Werkzeug.)
+    app.run(
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "5000")),
+        debug=_flag_env("FLASK_DEBUG"),
+    )

@@ -6,6 +6,7 @@
     <h1>Créer un compte</h1>
     <p class="muted">Quelques secondes suffisent.</p>
     <form method="post" action="{{ url_for('inscription') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label for="nom_entreprise">Nom de l'entreprise <span class="req">*</span></label>
         <input type="text" id="nom_entreprise" name="nom_entreprise" required

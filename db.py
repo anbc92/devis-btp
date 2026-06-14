@@ -77,6 +77,11 @@ def init_db():
             nom_entreprise  TEXT    NOT NULL DEFAULT '',
             created_at      TEXT    NOT NULL DEFAULT ''
         );
+
+        CREATE TABLE IF NOT EXISTS compteurs (
+            annee    INTEGER PRIMARY KEY,
+            dernier  INTEGER NOT NULL DEFAULT 0
+        );
         """
     )
 
@@ -86,8 +91,33 @@ def init_db():
     # Migration douce : colonne user_id sur devis (les anciens devis -> NULL).
     _ensure_columns(conn, "devis", {"user_id": "INTEGER"})
 
+    # Initialise les compteurs a partir des numeros de devis existants.
+    _init_compteurs(conn)
+
     conn.commit()
     conn.close()
+
+
+def _init_compteurs(conn):
+    """Aligne le compteur de chaque annee sur le plus grand numero existant.
+
+    Garantit que la prochaine sequence ne reutilisera jamais un numero deja
+    attribue (evite les collisions avec les devis existants).
+    """
+    maxima = {}
+    for r in conn.execute("SELECT numero FROM devis"):
+        try:
+            _, annee, seq = (r["numero"] or "").split("-")
+            annee, seq = int(annee), int(seq)
+        except (ValueError, AttributeError):
+            continue
+        maxima[annee] = max(maxima.get(annee, 0), seq)
+    for annee, m in maxima.items():
+        conn.execute(
+            "INSERT INTO compteurs (annee, dernier) VALUES (?, ?) "
+            "ON CONFLICT(annee) DO UPDATE SET dernier = MAX(dernier, excluded.dernier)",
+            (annee, m),
+        )
 
 
 def _migrer_profil(conn):

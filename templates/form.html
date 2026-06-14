@@ -10,6 +10,7 @@
 <form method="post"
       action="{{ url_for('modifier', devis_id=devis_id) if is_edit else url_for('nouveau') }}"
       class="card" id="devis-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="form-section">
     <h2>Client</h2>
     <div class="grid-2">

@@ -28,6 +28,7 @@
         <td data-label="Total TTC" class="num strong">{{ d.totaux.total_ttc | euro }}</td>
         <td data-label="Statut">
           <form method="post" action="{{ url_for('changer_statut', devis_id=d.id) }}" class="statut-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <select name="statut" class="statut-select statut-{{ d.statut }}" onchange="this.form.submit()">
               {% for s in STATUTS %}
               <option value="{{ s }}" {{ 'selected' if s == d.statut }}>{{ s | statut_label }}</option>
@@ -39,6 +40,7 @@
           <a href="{{ url_for('voir', devis_id=d.id) }}" class="btn btn-sm">Voir</a>
           <a href="{{ url_for('modifier', devis_id=d.id) }}" class="btn btn-sm">Modifier</a>
           <form method="post" action="{{ url_for('dupliquer', devis_id=d.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm">Dupliquer</button>
           </form>
           <a href="{{ url_for('pdf_devis', devis_id=d.id) }}" class="btn btn-sm" target="_blank">PDF</a>

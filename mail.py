@@ -1,10 +1,7 @@
 """Envoi d'un devis par e-mail via SMTP (smtplib, stdlib)."""
 
-import logging
 import smtplib
 from email.message import EmailMessage
-
-logger = logging.getLogger("devis-btp.mail")
 
 
 class MailError(Exception):
@@ -15,23 +12,6 @@ def config_smtp_ok(profil):
     """Vrai si le minimum requis pour envoyer est configure."""
     return bool((profil.get("mail_server") or "").strip()
                 and (profil.get("mail_from") or profil.get("mail_username")))
-
-
-def debug_config_smtp(profil, contexte=""):
-    """Affiche dans la console les valeurs SMTP lues, pour diagnostic."""
-    def etat(valeur):
-        valeur = (valeur or "").strip()
-        return f"'{valeur}'" if valeur else "(VIDE)"
-
-    pwd = profil.get("mail_password") or ""
-    logger.warning("---- DEBUG SMTP : %s ----", contexte)
-    logger.warning("  mail_server    = %s", etat(profil.get("mail_server")))
-    logger.warning("  mail_port      = %s", etat(profil.get("mail_port")))
-    logger.warning("  mail_username  = %s", etat(profil.get("mail_username")))
-    logger.warning("  mail_password  = %s",
-                   f"defini ({len(pwd)} caracteres)" if pwd else "(VIDE)")
-    logger.warning("  mail_from      = %s", etat(profil.get("mail_from")))
-    logger.warning("  config_smtp_ok = %s", config_smtp_ok(profil))
 
 
 def envoyer_devis(profil, destinataire, objet, corps, pdf_bytes, pdf_nom):

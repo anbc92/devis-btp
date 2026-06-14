@@ -14,9 +14,11 @@
   <button type="button" class="btn" id="open-mail">Envoyer par mail</button>
   <a href="{{ url_for('modifier', devis_id=devis.id) }}" class="btn">Modifier</a>
   <form method="post" action="{{ url_for('dupliquer', devis_id=devis.id) }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn">Dupliquer</button>
   </form>
   <form method="post" action="{{ url_for('changer_statut', devis_id=devis.id) }}" class="statut-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="muted">Statut :</label>
     <select name="statut" class="statut-select statut-{{ devis.statut }}" onchange="this.form.submit()">
       {% for s in STATUTS %}
@@ -26,6 +28,7 @@
   </form>
   <form method="post" action="{{ url_for('supprimer', devis_id=devis.id) }}"
         onsubmit="return confirm('Supprimer définitivement ce devis ?');" class="ml-auto">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
   </form>
 </div>
@@ -95,6 +98,7 @@
     {% endif %}
 
     <form method="post" action="{{ url_for('envoyer', devis_id=devis.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="field">
         <label for="destinataire">E-mail du destinataire <span class="req">*</span></label>
         <input type="email" id="destinataire" name="destinataire" required

@@ -133,11 +133,6 @@ def save_profil(user_id, valeurs, logo_path=None):
     conn.close()
 
 
-def get_profil_raw(user_id=None):
-    """Renvoie les valeurs BRUTES en base (sans fusion/defaut/env), pour debug."""
-    return _ligne_profil(user_id)
-
-
 def save_smtp(user_id, valeurs):
     """Enregistre (upsert) la config SMTP de `user_id`. `valeurs` : CHAMPS_SMTP.
 
