@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Signer le devis {{ devis.numero }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Devis {{ devis.numero }}</h1>
+    <p class="muted">{{ profil.nom_entreprise }} &middot; {{ devis.date_creation }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="client-block">
+    <h2>Adressé à</h2>
+    <p class="strong">{{ devis.client_nom }}</p>
+    {% if devis.client_adresse %}<p class="muted">{{ devis.client_adresse | replace('\n', '<br>') | safe }}</p>{% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Désignation</th>
+          <th class="num">Qté</th>
+          <th class="num">P.U. HT</th>
+          <th class="num">TVA</th>
+          <th class="num">Total HT</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prestations %}
+        <tr>
+          <td data-label="Désignation">{{ p.designation }}</td>
+          <td data-label="Qté" class="num">{{ '%g'|format(p.quantite) }}</td>
+          <td data-label="P.U. HT" class="num">{{ p.prix_unitaire | euro }}</td>
+          <td data-label="TVA" class="num">{{ '%g'|format(p.tva_taux) }} %</td>
+          <td data-label="Total HT" class="num strong">{{ p.total_ht | euro }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="totaux-final">
+    <div class="tf-row"><span>Total HT</span><b>{{ totaux.total_ht | euro }}</b></div>
+    {% for v in totaux.ventilation %}
+    <div class="tf-row"><span>TVA {{ '%g'|format(v.taux) }} %</span><b>{{ v.montant | euro }}</b></div>
+    {% endfor %}
+    <div class="tf-row tf-ttc"><span>Total TTC</span><b>{{ totaux.total_ttc | euro }}</b></div>
+  </div>
+
+  {% if devis.notes %}
+  <div class="notes-block">
+    <h3>Notes</h3>
+    <p class="muted">{{ devis.notes | replace('\n', '<br>') | safe }}</p>
+  </div>
+  {% endif %}
+</div>
+
+{% if signature %}
+<div class="card signature-box">
+  <h2>Devis signé ✓</h2>
+  <p class="muted">Signé par <strong>{{ signature.nom_signataire }}</strong> le {{ signature.date_signature }}. Merci !</p>
+  <div class="signature-preview">
+    <img src="{{ signature.signature_base64 }}" alt="Votre signature">
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <h2>Signer ce devis</h2>
+  <form method="post" action="{{ url_for('signer', token=token) }}" id="sign-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="nom_signataire">Votre nom et prénom <span class="req">*</span></label>
+      <input type="text" id="nom_signataire" name="nom_signataire" required
+             placeholder="Ex : Marie Martin" maxlength="120">
+    </div>
+
+    <div class="field">
+      <label>Votre signature <span class="req">*</span></label>
+      <div class="sig-wrap">
+        <canvas id="sig-canvas" class="sig-canvas" width="500" height="200"></canvas>
+      </div>
+      <button type="button" class="btn btn-sm btn-light" id="sig-clear">Effacer</button>
+      <input type="hidden" name="signature_data" id="signature_data">
+    </div>
+
+    <div class="field field-check">
+      <label>
+        <input type="checkbox" name="accepte" value="1" required>
+        J'accepte le devis et son montant total de {{ totaux.total_ttc | euro }}.
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" id="sig-submit">Valider ma signature</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not signature %}
+<script>
+  const canvas = document.getElementById('sig-canvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, hasDrawn = false;
+
+  // Adapte la resolution interne a la taille affichee (net sur ecran HiDPI).
+  function fitCanvas() {
+    const ratio = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1f2937';
+  }
+  fitCanvas();
+
+  function pos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+  function start(e) { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); }
+  function move(e) {
+    if (!drawing) return;
+    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; e.preventDefault();
+  }
+  function end() { drawing = false; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+
+  document.getElementById('sig-clear').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasDrawn = false;
+  });
+
+  document.getElementById('sign-form').addEventListener('submit', (e) => {
+    if (!hasDrawn) {
+      e.preventDefault();
+      alert('Merci de dessiner votre signature dans le cadre.');
+      return;
+    }
+    document.getElementById('signature_data').value = canvas.toDataURL('image/png');
+  });
+</script>
+{% endif %}
+{% endblock %}

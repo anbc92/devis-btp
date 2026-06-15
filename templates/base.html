@@ -15,6 +15,8 @@
       </a>
       <div class="topbar-actions">
         {% if session.user_id %}
+        <a href="{{ url_for('index') }}" class="btn btn-light">Mes devis</a>
+        <a href="{{ url_for('factures') }}" class="btn btn-light">Mes factures</a>
         <a href="{{ url_for('parametres') }}" class="btn btn-light">Paramètres</a>
         <a href="{{ url_for('profil') }}" class="btn btn-light">Mon profil &#9881;&#65039;</a>
         <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>

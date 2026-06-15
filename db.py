@@ -96,6 +96,33 @@ def init_db():
             annee    INTEGER PRIMARY KEY,
             dernier  INTEGER NOT NULL DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS compteurs_factures (
+            annee    INTEGER PRIMARY KEY,
+            dernier  INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS factures (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER,
+            devis_id        INTEGER NOT NULL UNIQUE,
+            numero_facture  TEXT    NOT NULL UNIQUE,
+            date_emission   TEXT    NOT NULL,
+            date_echeance   TEXT    NOT NULL DEFAULT '',
+            statut          TEXT    NOT NULL DEFAULT 'impayee',
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (devis_id) REFERENCES devis(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS signatures (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            devis_id         INTEGER NOT NULL,
+            nom_signataire   TEXT    NOT NULL,
+            signature_base64 TEXT    NOT NULL,
+            date_signature   TEXT    NOT NULL,
+            ip_adresse       TEXT    NOT NULL DEFAULT '',
+            FOREIGN KEY (devis_id) REFERENCES devis(id) ON DELETE CASCADE
+        );
         """
     )
 
@@ -117,13 +144,34 @@ def init_db():
         "validite_jours": "INTEGER NOT NULL DEFAULT 30",
         "date_debut_travaux": "TEXT NOT NULL DEFAULT ''",
         "delai_execution": "TEXT NOT NULL DEFAULT ''",
+        "signature_token": "TEXT",
     })
 
-    # Initialise les compteurs a partir des numeros de devis existants.
+    # Initialise les compteurs a partir des numeros de devis/factures existants.
     _init_compteurs(conn)
+    _init_compteurs_factures(conn)
 
     conn.commit()
     conn.close()
+
+
+def _init_compteurs_factures(conn):
+    """Aligne le compteur de factures de chaque annee sur le plus grand numero
+    existant (FAC-AAAA-NNNN), evitant toute collision de numerotation."""
+    maxima = {}
+    for r in conn.execute("SELECT numero_facture FROM factures"):
+        try:
+            _, annee, seq = (r["numero_facture"] or "").split("-")
+            annee, seq = int(annee), int(seq)
+        except (ValueError, AttributeError):
+            continue
+        maxima[annee] = max(maxima.get(annee, 0), seq)
+    for annee, m in maxima.items():
+        conn.execute(
+            "INSERT INTO compteurs_factures (annee, dernier) VALUES (?, ?) "
+            "ON CONFLICT(annee) DO UPDATE SET dernier = MAX(dernier, excluded.dernier)",
+            (annee, m),
+        )
 
 
 def _init_compteurs(conn):

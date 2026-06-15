@@ -17,6 +17,18 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn">Dupliquer</button>
   </form>
+  {% if facture %}
+  <a href="{{ url_for('voir_facture', facture_id=facture.id) }}" class="btn">Facture {{ facture.numero_facture }}</a>
+  {% elif devis.statut == 'accepte' %}
+  <form method="post" action="{{ url_for('facturer', devis_id=devis.id) }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary">Transformer en facture</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('lien_signature', devis_id=devis.id) }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn">Lien de signature</button>
+  </form>
   <form method="post" action="{{ url_for('changer_statut', devis_id=devis.id) }}" class="statut-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="muted">Statut :</label>
@@ -32,6 +44,26 @@
     <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
   </form>
 </div>
+
+{% if signature %}
+<div class="card signature-box">
+  <h3>Devis signé électroniquement</h3>
+  <p class="muted">Signé par <strong>{{ signature.nom_signataire }}</strong> le {{ signature.date_signature }}{% if signature.ip_adresse %} (IP {{ signature.ip_adresse }}){% endif %}.</p>
+  <div class="signature-preview">
+    <img src="{{ signature.signature_base64 }}" alt="Signature du client">
+  </div>
+</div>
+{% elif lien_signature %}
+<div class="card signature-box">
+  <h3>Lien de signature électronique</h3>
+  <p class="muted">Transmettez ce lien à votre client pour qu'il signe le devis en ligne (aucun compte requis) :</p>
+  <div class="copy-row">
+    <input type="text" id="signature-url" readonly value="{{ lien_signature }}">
+    <button type="button" class="btn btn-sm" id="copy-link">Copier</button>
+    <a href="{{ lien_signature }}" target="_blank" class="btn btn-sm">Ouvrir</a>
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="client-block">
@@ -156,5 +188,21 @@ Cordialement,
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') mailModal.hidden = true;
   });
+
+  // Copie du lien de signature
+  const copyBtn = document.getElementById('copy-link');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const input = document.getElementById('signature-url');
+      input.select();
+      try {
+        await navigator.clipboard.writeText(input.value);
+      } catch (e) {
+        document.execCommand('copy');
+      }
+      copyBtn.textContent = 'Copié !';
+      setTimeout(() => { copyBtn.textContent = 'Copier'; }, 1500);
+    });
+  }
 </script>
 {% endblock %}

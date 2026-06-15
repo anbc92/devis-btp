@@ -30,7 +30,9 @@ from profil import (
     CHAMPS_PROFIL, CHAMPS_SMTP,
 )
 from mail import envoyer_devis, envoyer_message, config_smtp_ok, MailError
-from config import ARTISAN, CONDITIONS, TAUX_TVA, STATUTS
+from config import (
+    ARTISAN, CONDITIONS, TAUX_TVA, STATUTS, STATUTS_FACTURE, ECHEANCE_JOURS,
+)
 
 
 def _flag_env(nom, defaut=False):
@@ -94,7 +96,8 @@ LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 # Filtres Jinja
 app.jinja_env.filters["euro"] = fmt_euro
-app.jinja_env.globals.update(STATUTS=STATUTS, ARTISAN=ARTISAN)
+app.jinja_env.globals.update(STATUTS=STATUTS, STATUTS_FACTURE=STATUTS_FACTURE,
+                             ARTISAN=ARTISAN)
 
 
 def current_user_id():
@@ -165,6 +168,14 @@ def _statut_label(statut):
 app.jinja_env.filters["statut_label"] = _statut_label
 
 
+def _statut_facture_label(statut):
+    return {"impayee": "Impayée", "payee": "Payée",
+            "en_retard": "En retard"}.get(statut, statut)
+
+
+app.jinja_env.filters["statut_facture_label"] = _statut_facture_label
+
+
 def _date_fr(valeur):
     """Formate une date ISO (AAAA-MM-JJ) en JJ/MM/AAAA, sinon renvoie tel quel."""
     valeur = (valeur or "").strip()
@@ -201,6 +212,42 @@ def _generer_numero(conn):
         (annee,),
     ).fetchone()
     return f"DEV-{annee}-{row['dernier']:04d}"
+
+
+def _generer_numero_facture(conn):
+    """Numero de facture : FAC-AAAA-NNNN via un compteur atomique par annee."""
+    annee = date.today().year
+    row = conn.execute(
+        "INSERT INTO compteurs_factures (annee, dernier) VALUES (?, 1) "
+        "ON CONFLICT(annee) DO UPDATE SET dernier = dernier + 1 "
+        "RETURNING dernier",
+        (annee,),
+    ).fetchone()
+    return f"FAC-{annee}-{row['dernier']:04d}"
+
+
+def _charger_facture_accessible(conn, facture_id):
+    """Renvoie la facture si l'utilisateur courant peut y acceder, sinon None.
+
+    Acces autorise pour ses propres factures et les factures legacy (NULL).
+    """
+    row = conn.execute(
+        "SELECT * FROM factures WHERE id = ?", (facture_id,)
+    ).fetchone()
+    if row is None:
+        return None
+    if row["user_id"] is not None and row["user_id"] != current_user_id():
+        return None
+    return row
+
+
+def _charger_signature(conn, devis_id):
+    """Renvoie la derniere signature enregistree pour un devis, ou None."""
+    row = conn.execute(
+        "SELECT * FROM signatures WHERE devis_id = ? ORDER BY id DESC LIMIT 1",
+        (devis_id,),
+    ).fetchone()
+    return dict(row) if row else None
 
 
 def _champs_conformite(form):
@@ -530,12 +577,23 @@ def voir(devis_id):
         abort(404)
     devis = dict(row)
     prestations = _charger_prestations(devis_id, conn)
+    facture = conn.execute(
+        "SELECT * FROM factures WHERE devis_id = ?", (devis_id,)
+    ).fetchone()
+    signature = _charger_signature(conn, devis_id)
     conn.close()
     for p in prestations:
         p["total_ht"] = ligne_total_ht(p)
     totaux = calcul_totaux(prestations)
+    # Lien public de signature (si un token a deja ete genere).
+    lien_signature = None
+    if devis.get("signature_token"):
+        lien_signature = url_for("signer", token=devis["signature_token"],
+                                 _external=True)
     return render_template("voir.html", devis=devis, prestations=prestations,
                            totaux=totaux, conditions=CONDITIONS,
+                           facture=dict(facture) if facture else None,
+                           signature=signature, lien_signature=lien_signature,
                            smtp_ok=config_smtp_ok(get_profil(current_user_id())))
 
 
@@ -549,6 +607,7 @@ def envoyer(devis_id):
         abort(404)
     devis = dict(row)
     prestations = _charger_prestations(devis_id, conn)
+    signature = _charger_signature(conn, devis_id)
     conn.close()  # libere la connexion avant les operations lentes (PDF, SMTP)
 
     destinataire = request.form.get("destinataire", "").strip()
@@ -556,7 +615,7 @@ def envoyer(devis_id):
     message = request.form.get("message", "").strip()
 
     prof = get_profil(current_user_id())
-    pdf_buf = generer_pdf(devis, prestations, prof)
+    pdf_buf = generer_pdf(devis, prestations, prof, signature=signature)
     try:
         envoyer_devis(prof, destinataire, objet, message,
                       pdf_buf.getvalue(), f"{devis['numero']}.pdf")
@@ -710,10 +769,264 @@ def pdf_devis(devis_id):
         abort(404)
     devis = dict(row)
     prestations = _charger_prestations(devis_id, conn)
+    signature = _charger_signature(conn, devis_id)
     conn.close()
-    buf = generer_pdf(devis, prestations, get_profil(current_user_id()))
+    buf = generer_pdf(devis, prestations, get_profil(current_user_id()),
+                      signature=signature)
     return send_file(buf, mimetype="application/pdf",
                      download_name=f"{devis['numero']}.pdf", as_attachment=False)
+
+
+# ---------------------------------------------------------------------------
+# Factures (transformation d'un devis accepte en facture)
+# ---------------------------------------------------------------------------
+
+@app.route("/devis/<int:devis_id>/facturer", methods=["POST"])
+@login_required
+def facturer(devis_id):
+    conn = get_db()
+    row = _charger_devis_accessible(conn, devis_id)
+    if row is None:
+        conn.close()
+        abort(404)
+    devis = dict(row)
+    if devis["statut"] != "accepte":
+        conn.close()
+        flash("Seul un devis accepté peut être transformé en facture.", "error")
+        return redirect(url_for("voir", devis_id=devis_id))
+
+    # Une seule facture par devis : si elle existe deja, on y redirige.
+    existante = conn.execute(
+        "SELECT id FROM factures WHERE devis_id = ?", (devis_id,)
+    ).fetchone()
+    if existante:
+        conn.close()
+        flash("Ce devis a déjà été facturé.", "ok")
+        return redirect(url_for("voir_facture", facture_id=existante["id"]))
+
+    numero = _generer_numero_facture(conn)
+    emission = date.today()
+    echeance = emission + timedelta(days=ECHEANCE_JOURS)
+    cur = conn.execute(
+        "INSERT INTO factures (user_id, devis_id, numero_facture, "
+        "date_emission, date_echeance, statut) VALUES (?, ?, ?, ?, ?, 'impayee')",
+        (current_user_id(), devis_id, numero,
+         emission.strftime("%d/%m/%Y"), echeance.strftime("%d/%m/%Y")),
+    )
+    facture_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    flash(f"Facture {numero} créée à partir du devis {devis['numero']}.", "ok")
+    return redirect(url_for("voir_facture", facture_id=facture_id))
+
+
+@app.route("/factures")
+@login_required
+def factures():
+    uid = current_user_id()
+    page = max(1, request.args.get("page", 1, type=int))
+    conn = get_db()
+    total = conn.execute(
+        "SELECT COUNT(*) AS c FROM factures WHERE user_id = ? OR user_id IS NULL",
+        (uid,),
+    ).fetchone()["c"]
+    rows = conn.execute(
+        "SELECT f.*, d.client_nom AS client_nom, d.numero AS devis_numero "
+        "FROM factures f JOIN devis d ON d.id = f.devis_id "
+        "WHERE f.user_id = ? OR f.user_id IS NULL "
+        "ORDER BY f.id DESC LIMIT ? OFFSET ?",
+        (uid, PAR_PAGE, (page - 1) * PAR_PAGE),
+    ).fetchall()
+
+    # Totaux TTC par facture (calcules depuis les prestations du devis lie).
+    devis_ids = [r["devis_id"] for r in rows]
+    par_devis = {}
+    if devis_ids:
+        marqueurs = ",".join("?" * len(devis_ids))
+        for p in conn.execute(
+            f"SELECT * FROM prestations WHERE devis_id IN ({marqueurs})", devis_ids
+        ):
+            par_devis.setdefault(p["devis_id"], []).append(dict(p))
+    conn.close()
+
+    factures_list = []
+    for r in rows:
+        f = dict(r)
+        f["totaux"] = calcul_totaux(par_devis.get(f["devis_id"], []))
+        factures_list.append(f)
+
+    pages = max(1, (total + PAR_PAGE - 1) // PAR_PAGE)
+    return render_template("factures.html", factures_list=factures_list,
+                           page=page, pages=pages, total=total)
+
+
+@app.route("/facture/<int:facture_id>")
+@login_required
+def voir_facture(facture_id):
+    conn = get_db()
+    row = _charger_facture_accessible(conn, facture_id)
+    if row is None:
+        conn.close()
+        abort(404)
+    facture = dict(row)
+    devis_row = conn.execute(
+        "SELECT * FROM devis WHERE id = ?", (facture["devis_id"],)
+    ).fetchone()
+    devis = dict(devis_row) if devis_row else {}
+    prestations = _charger_prestations(facture["devis_id"], conn)
+    conn.close()
+    for p in prestations:
+        p["total_ht"] = ligne_total_ht(p)
+    totaux = calcul_totaux(prestations)
+    return render_template("facture.html", facture=facture, devis=devis,
+                           prestations=prestations, totaux=totaux)
+
+
+@app.route("/facture/<int:facture_id>/statut", methods=["POST"])
+@login_required
+def changer_statut_facture(facture_id):
+    statut = request.form.get("statut")
+    if statut not in STATUTS_FACTURE:
+        abort(400)
+    conn = get_db()
+    if _charger_facture_accessible(conn, facture_id) is None:
+        conn.close()
+        abort(404)
+    conn.execute("UPDATE factures SET statut = ? WHERE id = ?",
+                 (statut, facture_id))
+    conn.commit()
+    conn.close()
+    return redirect(request.referrer or url_for("factures"))
+
+
+@app.route("/facture/<int:facture_id>/supprimer", methods=["POST"])
+@login_required
+def supprimer_facture(facture_id):
+    conn = get_db()
+    if _charger_facture_accessible(conn, facture_id) is None:
+        conn.close()
+        abort(404)
+    conn.execute("DELETE FROM factures WHERE id = ?", (facture_id,))
+    conn.commit()
+    conn.close()
+    flash("Facture supprimée.", "ok")
+    return redirect(url_for("factures"))
+
+
+@app.route("/facture/<int:facture_id>/pdf")
+@login_required
+def pdf_facture(facture_id):
+    conn = get_db()
+    row = _charger_facture_accessible(conn, facture_id)
+    if row is None:
+        conn.close()
+        abort(404)
+    facture = dict(row)
+    devis_row = conn.execute(
+        "SELECT * FROM devis WHERE id = ?", (facture["devis_id"],)
+    ).fetchone()
+    devis = dict(devis_row) if devis_row else {}
+    prestations = _charger_prestations(facture["devis_id"], conn)
+    conn.close()
+    buf = generer_pdf(devis, prestations, get_profil(current_user_id()),
+                      facture=facture)
+    return send_file(buf, mimetype="application/pdf",
+                     download_name=f"{facture['numero_facture']}.pdf",
+                     as_attachment=False)
+
+
+# ---------------------------------------------------------------------------
+# Signature electronique (lien public)
+# ---------------------------------------------------------------------------
+
+@app.route("/devis/<int:devis_id>/lien-signature", methods=["POST"])
+@login_required
+def lien_signature(devis_id):
+    conn = get_db()
+    row = _charger_devis_accessible(conn, devis_id)
+    if row is None:
+        conn.close()
+        abort(404)
+    token = row["signature_token"]
+    if not token:
+        token = secrets.token_urlsafe(32)
+        conn.execute("UPDATE devis SET signature_token = ? WHERE id = ?",
+                     (token, devis_id))
+        conn.commit()
+    conn.close()
+    flash("Lien de signature prêt. Transmettez-le à votre client.", "ok")
+    return redirect(url_for("voir", devis_id=devis_id))
+
+
+def _charger_devis_par_token(conn, token):
+    if not token:
+        return None
+    return conn.execute(
+        "SELECT * FROM devis WHERE signature_token = ?", (token,)
+    ).fetchone()
+
+
+@app.route("/signer/<token>", methods=["GET", "POST"])
+@limiter.limit("20 per hour", methods=["POST"])
+def signer(token):
+    conn = get_db()
+    row = _charger_devis_par_token(conn, token)
+    if row is None:
+        conn.close()
+        abort(404)
+    devis = dict(row)
+    signature = _charger_signature(conn, devis["id"])
+
+    if request.method == "POST":
+        if signature:  # deja signe : on ne re-signe pas
+            conn.close()
+            flash("Ce devis a déjà été signé.", "ok")
+            return redirect(url_for("signer", token=token))
+
+        nom = request.form.get("nom_signataire", "").strip()
+        accepte = request.form.get("accepte")
+        signature_data = request.form.get("signature_data", "").strip()
+
+        erreurs = []
+        if not nom:
+            erreurs.append("Indiquez votre nom.")
+        if not accepte:
+            erreurs.append("Vous devez cocher « J'accepte le devis ».")
+        if not signature_data.startswith("data:image/") or len(signature_data) < 100:
+            erreurs.append("Votre signature manuscrite est requise.")
+        if len(signature_data) > 1_000_000:
+            erreurs.append("Signature trop volumineuse.")
+        if erreurs:
+            conn.close()
+            for e in erreurs:
+                flash(e, "error")
+            return redirect(url_for("signer", token=token))
+
+        ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "")
+              .split(",")[0].strip())
+        conn.execute(
+            "INSERT INTO signatures (devis_id, nom_signataire, signature_base64, "
+            "date_signature, ip_adresse) VALUES (?, ?, ?, ?, ?)",
+            (devis["id"], nom, signature_data,
+             datetime.now().strftime("%d/%m/%Y %H:%M"), ip),
+        )
+        conn.execute("UPDATE devis SET statut = 'accepte' WHERE id = ?",
+                     (devis["id"],))
+        conn.commit()
+        conn.close()
+        flash("Merci ! Votre signature a bien été enregistrée. "
+              "Le devis est désormais accepté.", "ok")
+        return redirect(url_for("signer", token=token))
+
+    prestations = _charger_prestations(devis["id"], conn)
+    conn.close()
+    for p in prestations:
+        p["total_ht"] = ligne_total_ht(p)
+    totaux = calcul_totaux(prestations)
+    prof = get_profil(devis.get("user_id"))
+    return render_template("signer.html", devis=devis, prestations=prestations,
+                           totaux=totaux, profil=prof, signature=signature,
+                           token=token)
 
 
 def _enregistrer_logo(fichier, user_id):

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Mes factures{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Mes factures</h1>
+  <p class="muted">{{ total }} facture(s) au total</p>
+</div>
+
+{% if factures_list %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Numéro</th>
+        <th>Client</th>
+        <th>Émission</th>
+        <th>Échéance</th>
+        <th class="num">Total TTC</th>
+        <th>Statut</th>
+        <th class="actions-col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in factures_list %}
+      <tr>
+        <td data-label="Numéro">
+          <a href="{{ url_for('voir_facture', facture_id=f.id) }}" class="link-strong">{{ f.numero_facture }}</a><br>
+          <small class="muted">Devis {{ f.devis_numero }}</small>
+        </td>
+        <td data-label="Client">{{ f.client_nom }}</td>
+        <td data-label="Émission">{{ f.date_emission }}</td>
+        <td data-label="Échéance">{{ f.date_echeance }}</td>
+        <td data-label="Total TTC" class="num strong">{{ f.totaux.total_ttc | euro }}</td>
+        <td data-label="Statut">
+          <form method="post" action="{{ url_for('changer_statut_facture', facture_id=f.id) }}" class="statut-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="statut" class="statut-select fstatut-{{ f.statut }}" onchange="this.form.submit()">
+              {% for s in STATUTS_FACTURE %}
+              <option value="{{ s }}" {{ 'selected' if s == f.statut }}>{{ s | statut_facture_label }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td data-label="Actions" class="actions">
+          <a href="{{ url_for('voir_facture', facture_id=f.id) }}" class="btn btn-sm">Voir</a>
+          <a href="{{ url_for('pdf_facture', facture_id=f.id) }}" class="btn btn-sm" target="_blank">PDF</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <a class="btn btn-sm" href="{{ url_for('factures', page=page-1) }}">&larr; Précédent</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn-sm" href="{{ url_for('factures', page=page+1) }}">Suivant &rarr;</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty">
+  <p>Aucune facture pour le moment.</p>
+  <p class="muted">Transformez un devis accepté en facture depuis sa fiche.</p>
+  <a href="{{ url_for('index') }}" class="btn btn-primary">Voir mes devis</a>
+</div>
+{% endif %}
+{% endblock %}

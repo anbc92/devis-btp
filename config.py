@@ -35,3 +35,9 @@ TAUX_TVA = [20.0, 10.0, 5.5, 0.0]
 
 # Libelles des statuts de devis
 STATUTS = ["brouillon", "envoye", "accepte", "refuse"]
+
+# Statuts de facture (paiement)
+STATUTS_FACTURE = ["impayee", "payee", "en_retard"]
+
+# Delai d'echeance par defaut d'une facture (jours apres emission)
+ECHEANCE_JOURS = 30
