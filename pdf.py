@@ -1,5 +1,6 @@
 """Generation du PDF d'un devis avec ReportLab (mise en page pro)."""
 
+from datetime import datetime, timedelta
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -84,13 +85,42 @@ def _styles():
     return styles
 
 
-def generer_pdf(devis, prestations):
+def _fmt_date_fr(valeur):
+    """Formate une date ISO (AAAA-MM-JJ) au format francais JJ/MM/AAAA.
+
+    Renvoie la valeur telle quelle si elle n'est pas une date ISO reconnue.
+    """
+    valeur = (valeur or "").strip()
+    if not valeur:
+        return ""
+    try:
+        return datetime.strptime(valeur, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        return valeur
+
+
+def _date_limite_validite(date_creation, jours):
+    """Calcule la date limite de validite : date_creation (JJ/MM/AAAA) + jours."""
+    try:
+        base = datetime.strptime((date_creation or "").strip(), "%d/%m/%Y")
+    except (ValueError, TypeError):
+        return None
+    try:
+        jours = int(jours)
+    except (ValueError, TypeError):
+        return None
+    return (base + timedelta(days=jours)).strftime("%d/%m/%Y")
+
+
+def generer_pdf(devis, prestations, prof=None):
     """Construit le PDF en memoire et renvoie un BytesIO positionne a 0.
 
     `devis` : mapping (numero, client_nom, client_adresse, client_email,
-              date_creation, notes).
+              date_creation, notes, validite_jours, date_debut_travaux,
+              delai_execution).
     `prestations` : liste de mappings (designation, quantite, prix_unitaire,
                     tva_taux).
+    `prof` : profil de l'artisan emetteur. Si None, profil legacy (defauts).
     """
     buf = BytesIO()
     doc = SimpleDocTemplate(
@@ -99,7 +129,8 @@ def generer_pdf(devis, prestations):
         topMargin=16 * mm, bottomMargin=16 * mm,
         title=f"Devis {devis['numero']}",
     )
-    prof = get_profil()
+    if prof is None:
+        prof = get_profil()
     st = _styles()
     story = []
 
@@ -149,6 +180,33 @@ def generer_pdf(devis, prestations):
     ]))
     story.append(bloc_client)
     story.append(Spacer(1, 8 * mm))
+
+    # --- Informations chantier (validite, debut des travaux, delai) ---
+    validite_jours = devis.get("validite_jours") or prof.get("validite_jours") or 30
+    date_limite = _date_limite_validite(devis.get("date_creation"), validite_jours)
+    date_debut = _fmt_date_fr(devis.get("date_debut_travaux"))
+    delai = (devis.get("delai_execution") or "").strip()
+
+    infos = [("Validite du devis", f"{validite_jours} jours")]
+    if date_debut:
+        infos.append(("Debut des travaux (estime)", date_debut))
+    if delai:
+        infos.append(("Delai d'execution", delai))
+
+    infos_html = "  &nbsp;|&nbsp;  ".join(
+        f"<b>{label} :</b> {valeur}" for label, valeur in infos
+    )
+    bloc_infos = Table([[Paragraph(infos_html, st["small"])]], colWidths=[174 * mm])
+    bloc_infos.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.5, GRIS_LIGNE),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.append(bloc_infos)
+    story.append(Spacer(1, 6 * mm))
 
     # --- Tableau des prestations ---
     header = [
@@ -230,14 +288,30 @@ def generer_pdf(devis, prestations):
 
     # --- Conditions de paiement ---
     acompte = round(totaux["total_ttc"] * prof["acompte_pct"] / 100.0, 2)
-    cond_html = (
-        f"<b>Conditions de paiement</b><br/>"
-        f"Validite du devis : {prof['validite_jours']} jours.<br/>"
+    validite_txt = f"Validite du devis : {validite_jours} jours"
+    if date_limite:
+        validite_txt += f" (valable jusqu'au {date_limite})"
+    cond_lignes = [
+        "<b>Conditions de paiement</b>",
+        f"{validite_txt}.",
         f"Acompte de {prof['acompte_pct']} % a la commande, soit "
-        f"{fmt_euro(acompte)}.<br/>"
-        f"{prof['conditions_paiement']}<br/>"
-        f"IBAN : {prof['iban']}"
-    )
+        f"{fmt_euro(acompte)}.",
+        prof["conditions_paiement"],
+        f"IBAN : {prof['iban']}",
+    ]
+    # Assurance decennale (mention obligatoire BTP si souscrite).
+    decennale = (prof.get("assurance_decennale") or "").strip()
+    if decennale:
+        assureur = (prof.get("assureur_nom") or "").strip()
+        mention_dec = f"Assurance decennale : {decennale}"
+        if assureur:
+            mention_dec += f" (assureur : {assureur})"
+        cond_lignes.append(mention_dec)
+    # Franchise en base de TVA (auto-entrepreneur).
+    if prof.get("auto_entrepreneur"):
+        cond_lignes.append(
+            "<b>TVA non applicable - article 293 B du CGI.</b>")
+    cond_html = "<br/>".join(cond_lignes)
     bloc_cond = Table([[Paragraph(cond_html, st["small"])]], colWidths=[174 * mm])
     bloc_cond.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), BLEU_CLAIR),
@@ -249,6 +323,12 @@ def generer_pdf(devis, prestations):
     ]))
     story.append(bloc_cond)
     story.append(Spacer(1, 6 * mm))
+
+    # --- Mention "Devis valable jusqu'au ..." en bas de page ---
+    if date_limite:
+        story.append(Paragraph(
+            f"<b>Devis valable jusqu'au {date_limite}.</b>", st["small"]))
+        story.append(Spacer(1, 4 * mm))
 
     # --- Bon pour accord ---
     accord = Table([[
@@ -282,8 +362,11 @@ def _make_pied(prof):
             f"{prof['nom_entreprise']} - SIRET {prof['siret']} - "
             f"TVA {prof['tva_intra']} - APE {prof['ape']} - {adresse_ligne}"
         )
+        # Mention de franchise de TVA : uniquement pour les auto-entrepreneurs.
+        if prof.get("auto_entrepreneur") and prof.get("mention_tva"):
+            canvas.drawCentredString(A4[0] / 2, 13 * mm, prof["mention_tva"])
         canvas.drawCentredString(A4[0] / 2, 10 * mm, ligne)
-        canvas.drawCentredString(A4[0] / 2, 6 * mm, prof["mentions"][:120])
+        canvas.drawCentredString(A4[0] / 2, 6 * mm, prof["mentions"][:140])
         canvas.restoreState()
 
     return _pied

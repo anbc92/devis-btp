@@ -41,6 +41,17 @@
     {% if devis.client_email %}<p class="muted">{{ devis.client_email }}</p>{% endif %}
   </div>
 
+  <div class="planning-block">
+    <h3>Validité &amp; planning</h3>
+    <p class="muted">Validité : {{ devis.validite_jours or 30 }} jours</p>
+    {% if devis.date_debut_travaux %}
+    <p class="muted">Début des travaux (estimé) : {{ devis.date_debut_travaux | date_fr }}</p>
+    {% endif %}
+    {% if devis.delai_execution %}
+    <p class="muted">Délai d'exécution : {{ devis.delai_execution }}</p>
+    {% endif %}
+  </div>
+
   <div class="table-wrap">
     <table class="data-table">
       <thead>

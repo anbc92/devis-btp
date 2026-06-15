@@ -56,6 +56,30 @@
   </section>
 
   <section class="form-section">
+    <h2>Assurance &amp; TVA</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="assurance_decennale">N° d'assurance décennale</label>
+        <input type="text" id="assurance_decennale" name="assurance_decennale"
+               value="{{ form.assurance_decennale or '' }}" placeholder="N° de contrat / police">
+      </div>
+      <div class="field">
+        <label for="assureur_nom">Nom de l'assureur</label>
+        <input type="text" id="assureur_nom" name="assureur_nom"
+               value="{{ form.assureur_nom or '' }}" placeholder="Ex : AXA, MAAF...">
+      </div>
+    </div>
+    <div class="field field-check">
+      <label>
+        <input type="checkbox" name="auto_entrepreneur" value="1"
+               {% if form.auto_entrepreneur %}checked{% endif %}>
+        Auto-entrepreneur &mdash; afficher la mention « TVA non applicable, article 293 B du CGI »
+      </label>
+      <p class="muted">Cochez cette case si vous bénéficiez de la franchise en base de TVA.</p>
+    </div>
+  </section>
+
+  <section class="form-section">
     <h2>Conditions de paiement</h2>
     <div class="field">
       <textarea name="conditions_paiement" rows="2"

@@ -165,6 +165,20 @@ def _statut_label(statut):
 app.jinja_env.filters["statut_label"] = _statut_label
 
 
+def _date_fr(valeur):
+    """Formate une date ISO (AAAA-MM-JJ) en JJ/MM/AAAA, sinon renvoie tel quel."""
+    valeur = (valeur or "").strip()
+    if not valeur:
+        return ""
+    try:
+        return datetime.strptime(valeur, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        return valeur
+
+
+app.jinja_env.filters["date_fr"] = _date_fr
+
+
 def _charger_prestations(devis_id, conn):
     rows = conn.execute(
         "SELECT * FROM prestations WHERE devis_id = ? ORDER BY position, id",
@@ -187,6 +201,22 @@ def _generer_numero(conn):
         (annee,),
     ).fetchone()
     return f"DEV-{annee}-{row['dernier']:04d}"
+
+
+def _champs_conformite(form):
+    """Extrait du formulaire les champs de conformite reglementaire du devis :
+    validite (jours), date de debut des travaux et delai d'execution."""
+    try:
+        validite = int((form.get("validite_jours") or "").strip())
+    except (ValueError, AttributeError):
+        validite = 0
+    if validite <= 0:
+        validite = 30  # defaut reglementaire usuel
+    return {
+        "validite_jours": validite,
+        "date_debut_travaux": (form.get("date_debut_travaux") or "").strip(),
+        "delai_execution": (form.get("delai_execution") or "").strip(),
+    }
 
 
 def _parse_lignes(form):
@@ -457,18 +487,22 @@ def nouveau():
                                    prestations=_parse_lignes(request.form),
                                    mode="nouveau")
 
+        conf = _champs_conformite(request.form)
         conn = get_db()
         numero = _generer_numero(conn)
         cur = conn.execute(
             "INSERT INTO devis (numero, client_nom, client_adresse, "
-            "client_email, statut, notes, date_creation, user_id) "
-            "VALUES (?, ?, ?, ?, 'brouillon', ?, ?, ?)",
+            "client_email, statut, notes, date_creation, user_id, "
+            "validite_jours, date_debut_travaux, delai_execution) "
+            "VALUES (?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?)",
             (numero, client_nom,
              request.form.get("client_adresse", "").strip(),
              request.form.get("client_email", "").strip(),
              request.form.get("notes", "").strip(),
              date.today().strftime("%d/%m/%Y"),
-             current_user_id()),
+             current_user_id(),
+             conf["validite_jours"], conf["date_debut_travaux"],
+             conf["delai_execution"]),
         )
         devis_id = cur.lastrowid
         for pos, lg in enumerate(lignes):
@@ -522,7 +556,7 @@ def envoyer(devis_id):
     message = request.form.get("message", "").strip()
 
     prof = get_profil(current_user_id())
-    pdf_buf = generer_pdf(devis, prestations)
+    pdf_buf = generer_pdf(devis, prestations, prof)
     try:
         envoyer_devis(prof, destinataire, objet, message,
                       pdf_buf.getvalue(), f"{devis['numero']}.pdf")
@@ -552,10 +586,13 @@ def dupliquer(devis_id):
     numero = _generer_numero(conn)
     cur = conn.execute(
         "INSERT INTO devis (numero, client_nom, client_adresse, client_email, "
-        "statut, notes, date_creation, user_id) "
-        "VALUES (?, ?, ?, ?, 'brouillon', ?, ?, ?)",
+        "statut, notes, date_creation, user_id, validite_jours, "
+        "date_debut_travaux, delai_execution) "
+        "VALUES (?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?)",
         (numero, src["client_nom"], src["client_adresse"], src["client_email"],
-         src["notes"], date.today().strftime("%d/%m/%Y"), current_user_id()),
+         src["notes"], date.today().strftime("%d/%m/%Y"), current_user_id(),
+         src["validite_jours"], src["date_debut_travaux"],
+         src["delai_execution"]),
     )
     nouveau_id = cur.lastrowid
     for pos, p in enumerate(prestations):
@@ -599,14 +636,17 @@ def modifier(devis_id):
                                    prestations=lignes,
                                    mode="modifier", devis_id=devis_id)
 
+        conf = _champs_conformite(request.form)
         conn.execute(
             "UPDATE devis SET client_nom = ?, client_adresse = ?, "
-            "client_email = ?, notes = ? WHERE id = ?",
+            "client_email = ?, notes = ?, validite_jours = ?, "
+            "date_debut_travaux = ?, delai_execution = ? WHERE id = ?",
             (client_nom,
              request.form.get("client_adresse", "").strip(),
              request.form.get("client_email", "").strip(),
              request.form.get("notes", "").strip(),
-             devis_id),
+             conf["validite_jours"], conf["date_debut_travaux"],
+             conf["delai_execution"], devis_id),
         )
         conn.execute("DELETE FROM prestations WHERE devis_id = ?", (devis_id,))
         for pos, lg in enumerate(lignes):
@@ -671,7 +711,7 @@ def pdf_devis(devis_id):
     devis = dict(row)
     prestations = _charger_prestations(devis_id, conn)
     conn.close()
-    buf = generer_pdf(devis, prestations)
+    buf = generer_pdf(devis, prestations, get_profil(current_user_id()))
     return send_file(buf, mimetype="application/pdf",
                      download_name=f"{devis['numero']}.pdf", as_attachment=False)
 

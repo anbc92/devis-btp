@@ -33,6 +33,27 @@
   </section>
 
   <section class="form-section">
+    <h2>Validité et planning</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="validite_jours">Durée de validité du devis (jours)</label>
+        <input type="number" id="validite_jours" name="validite_jours" min="1" step="1"
+               value="{{ form.validite_jours or 30 }}" placeholder="30">
+      </div>
+      <div class="field">
+        <label for="date_debut_travaux">Date de début des travaux (estimée)</label>
+        <input type="date" id="date_debut_travaux" name="date_debut_travaux"
+               value="{{ form.date_debut_travaux or '' }}">
+      </div>
+    </div>
+    <div class="field">
+      <label for="delai_execution">Délai d'exécution</label>
+      <input type="text" id="delai_execution" name="delai_execution"
+             value="{{ form.delai_execution or '' }}" placeholder="Ex : 3 semaines / 15 jours ouvrés">
+    </div>
+  </section>
+
+  <section class="form-section">
     <h2>Prestations</h2>
     <div class="table-wrap">
       <table class="lignes-table" id="lignes-table">

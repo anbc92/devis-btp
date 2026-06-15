@@ -12,11 +12,18 @@ from db import get_db
 from config import ARTISAN, CONDITIONS
 from chiffrement import chiffrer, dechiffrer
 
-# Champs editables via le formulaire /profil (= colonnes de la table profil)
-CHAMPS_PROFIL = [
+# Champs texte editables via le formulaire /profil (= colonnes de la table profil)
+CHAMPS_PROFIL_TEXTE = [
     "nom_entreprise", "gerant", "adresse", "telephone", "email",
-    "siret", "iban", "conditions_paiement",
+    "siret", "iban", "conditions_paiement", "assurance_decennale",
+    "assureur_nom",
 ]
+
+# Case a cocher (auto-entrepreneur) : stockee en entier 0/1.
+CHAMPS_PROFIL_BOOL = ["auto_entrepreneur"]
+
+# Ensemble des champs lus depuis le formulaire /profil.
+CHAMPS_PROFIL = CHAMPS_PROFIL_TEXTE + CHAMPS_PROFIL_BOOL
 
 # Champs SMTP editables via le formulaire /parametres
 CHAMPS_SMTP = [
@@ -35,6 +42,11 @@ _SMTP_ENV = {
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+def _coerce_bool(valeur):
+    """Convertit une valeur de formulaire (case a cocher) en entier 0/1."""
+    return 1 if str(valeur or "").strip().lower() in ("1", "on", "true", "yes") else 0
+
+
 def logo_rel(user_id):
     """Chemin relatif (a /static) du logo d'un utilisateur."""
     return f"uploads/logo_{user_id}.png"
@@ -51,6 +63,9 @@ def _defauts():
         "siret": ARTISAN["siret"],
         "iban": ARTISAN["iban"],
         "conditions_paiement": CONDITIONS["paiement"],
+        "assurance_decennale": "",
+        "assureur_nom": "",
+        "auto_entrepreneur": 0,
         "logo_path": "",
     }
 
@@ -89,6 +104,7 @@ def get_profil(user_id=None):
     data["validite_jours"] = CONDITIONS["validite_jours"]
     data["acompte_pct"] = CONDITIONS["acompte_pct"]
     data["mentions"] = CONDITIONS["mentions"]
+    data["mention_tva"] = CONDITIONS["mention_tva"]
 
     # Config SMTP : valeur en base sinon variable d'environnement.
     # Le mot de passe est dechiffre (stocke chiffre au repos).
@@ -114,12 +130,20 @@ def save_profil(user_id, valeurs, logo_path=None):
         "SELECT logo_path FROM profil WHERE user_id = ?", (user_id,)
     ).fetchone()
     logo = logo_path if logo_path is not None else (row["logo_path"] if row else "")
+    params = {c: (valeurs.get(c) or "").strip() for c in CHAMPS_PROFIL_TEXTE}
+    for c in CHAMPS_PROFIL_BOOL:
+        params[c] = _coerce_bool(valeurs.get(c))
+    params["user_id"] = user_id
+    params["logo_path"] = logo
     conn.execute(
         """
         INSERT INTO profil (user_id, nom_entreprise, gerant, adresse, telephone,
-                            email, siret, iban, conditions_paiement, logo_path)
+                            email, siret, iban, conditions_paiement,
+                            assurance_decennale, assureur_nom, auto_entrepreneur,
+                            logo_path)
         VALUES (:user_id, :nom_entreprise, :gerant, :adresse, :telephone, :email,
-                :siret, :iban, :conditions_paiement, :logo_path)
+                :siret, :iban, :conditions_paiement, :assurance_decennale,
+                :assureur_nom, :auto_entrepreneur, :logo_path)
         ON CONFLICT(user_id) DO UPDATE SET
             nom_entreprise = excluded.nom_entreprise,
             gerant = excluded.gerant,
@@ -129,10 +153,12 @@ def save_profil(user_id, valeurs, logo_path=None):
             siret = excluded.siret,
             iban = excluded.iban,
             conditions_paiement = excluded.conditions_paiement,
+            assurance_decennale = excluded.assurance_decennale,
+            assureur_nom = excluded.assureur_nom,
+            auto_entrepreneur = excluded.auto_entrepreneur,
             logo_path = excluded.logo_path
         """,
-        {**{c: (valeurs.get(c) or "").strip() for c in CHAMPS_PROFIL},
-         "user_id": user_id, "logo_path": logo},
+        params,
     )
     conn.commit()
     conn.close()

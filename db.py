@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS profil (
     siret                TEXT NOT NULL DEFAULT '',
     iban                 TEXT NOT NULL DEFAULT '',
     conditions_paiement  TEXT NOT NULL DEFAULT '',
+    assurance_decennale  TEXT NOT NULL DEFAULT '',
+    assureur_nom         TEXT NOT NULL DEFAULT '',
+    auto_entrepreneur    INTEGER NOT NULL DEFAULT 0,
     logo_path            TEXT NOT NULL DEFAULT '',
     mail_server          TEXT NOT NULL DEFAULT '',
     mail_port            TEXT NOT NULL DEFAULT '',
@@ -41,7 +44,8 @@ CREATE TABLE IF NOT EXISTS profil (
 # Colonnes de profil susceptibles d'etre copiees lors d'une migration.
 _PROFIL_COLONNES = [
     "nom_entreprise", "gerant", "adresse", "telephone", "email", "siret",
-    "iban", "conditions_paiement", "logo_path", "mail_server", "mail_port",
+    "iban", "conditions_paiement", "assurance_decennale", "assureur_nom",
+    "auto_entrepreneur", "logo_path", "mail_server", "mail_port",
     "mail_username", "mail_password", "mail_from",
 ]
 
@@ -98,8 +102,22 @@ def init_db():
     # Profil : creation (nouveau schema) ou migration depuis l'ancien (id=1).
     _migrer_profil(conn)
 
-    # Migration douce : colonne user_id sur devis (les anciens devis -> NULL).
-    _ensure_columns(conn, "devis", {"user_id": "INTEGER"})
+    # Migration douce : colonnes de conformite reglementaire sur profil
+    # (assurance decennale, auto-entrepreneur) pour les bases existantes.
+    _ensure_columns(conn, "profil", {
+        "assurance_decennale": "TEXT NOT NULL DEFAULT ''",
+        "assureur_nom": "TEXT NOT NULL DEFAULT ''",
+        "auto_entrepreneur": "INTEGER NOT NULL DEFAULT 0",
+    })
+
+    # Migration douce : colonne user_id sur devis (les anciens devis -> NULL)
+    # et champs de conformite (validite, dates/delai de chantier).
+    _ensure_columns(conn, "devis", {
+        "user_id": "INTEGER",
+        "validite_jours": "INTEGER NOT NULL DEFAULT 30",
+        "date_debut_travaux": "TEXT NOT NULL DEFAULT ''",
+        "delai_execution": "TEXT NOT NULL DEFAULT ''",
+    })
 
     # Initialise les compteurs a partir des numeros de devis existants.
     _init_compteurs(conn)
