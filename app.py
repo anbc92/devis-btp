@@ -250,6 +250,36 @@ def _charger_signature(conn, devis_id):
     return dict(row) if row else None
 
 
+def _maj_factures_en_retard(conn, user_id):
+    """Passe en 'en_retard' les factures impayees dont l'echeance est depassee.
+
+    Appelee a la lecture des factures (liste/detail) : la date d'echeance etant
+    stockee en JJ/MM/AAAA, la comparaison se fait en Python. Idempotent, et ne
+    touche jamais les factures payees ou deja marquees en retard.
+    """
+    aujourdhui = date.today()
+    a_modifier = []
+    for row in conn.execute(
+        "SELECT id, date_echeance FROM factures "
+        "WHERE statut = 'impayee' AND (user_id = ? OR user_id IS NULL)",
+        (user_id,),
+    ):
+        try:
+            echeance = datetime.strptime(
+                (row["date_echeance"] or "").strip(), "%d/%m/%Y").date()
+        except ValueError:
+            continue  # echeance absente ou illisible : on n'y touche pas
+        if echeance < aujourdhui:
+            a_modifier.append(row["id"])
+    if a_modifier:
+        marqueurs = ",".join("?" * len(a_modifier))
+        conn.execute(
+            f"UPDATE factures SET statut = 'en_retard' WHERE id IN ({marqueurs})",
+            a_modifier,
+        )
+        conn.commit()
+
+
 def _champs_conformite(form):
     """Extrait du formulaire les champs de conformite reglementaire du devis :
     validite (jours), date de debut des travaux et delai d'execution."""
@@ -826,6 +856,7 @@ def factures():
     uid = current_user_id()
     page = max(1, request.args.get("page", 1, type=int))
     conn = get_db()
+    _maj_factures_en_retard(conn, uid)
     total = conn.execute(
         "SELECT COUNT(*) AS c FROM factures WHERE user_id = ? OR user_id IS NULL",
         (uid,),
@@ -864,6 +895,7 @@ def factures():
 @login_required
 def voir_facture(facture_id):
     conn = get_db()
+    _maj_factures_en_retard(conn, current_user_id())
     row = _charger_facture_accessible(conn, facture_id)
     if row is None:
         conn.close()
