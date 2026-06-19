@@ -30,6 +30,7 @@ from profil import (
     CHAMPS_PROFIL, CHAMPS_SMTP,
 )
 from mail import envoyer_devis, envoyer_message, config_smtp_ok, MailError
+from chiffrement import cle_non_securisee
 from config import (
     ARTISAN, CONDITIONS, TAUX_TVA, STATUTS, STATUTS_FACTURE, ECHEANCE_JOURS,
 )
@@ -51,6 +52,15 @@ if not _secret:
         "SECRET_KEY absente de l'environnement : cle ephemere generee "
         "(les sessions ne survivront pas a un redemarrage).")
 app.secret_key = _secret
+
+# Avertit si les secrets en base (mot de passe SMTP) sont chiffres avec la cle
+# de repli publique : c'est le cas quand ni ENCRYPTION_KEY ni SECRET_KEY ne sont
+# definies. En production, definir au moins l'une des deux.
+if cle_non_securisee():
+    app.logger.warning(
+        "Aucune cle de chiffrement configuree (ENCRYPTION_KEY ou SECRET_KEY) : "
+        "les mots de passe SMTP sont chiffres avec une cle par defaut publique. "
+        "Definissez SECRET_KEY (ou ENCRYPTION_KEY) en production.")
 
 # Securite des cookies de session
 app.config.update(
@@ -981,7 +991,7 @@ def lien_signature(devis_id):
         abort(404)
     token = row["signature_token"]
     if not token:
-        token = secrets.token_urlsafe(32)
+        token = secrets.token_urlsafe(9)  # ~12 caracteres, 72 bits d'entropie
         conn.execute("UPDATE devis SET signature_token = ? WHERE id = ?",
                      (token, devis_id))
         conn.commit()

@@ -245,8 +245,14 @@ textarea { resize: vertical; }
 @media (max-width: 720px) {
   h1 { font-size: 1.35rem; }
   .grid-2 { grid-template-columns: 1fr; }
-  .topbar-inner { height: 56px; }
   .brand span:not(.logo) { font-size: .95rem; }
+
+  /* Barre de navigation : autorise le retour a la ligne plutot que de
+     deborder horizontalement sur petit ecran. */
+  .topbar-inner { height: auto; flex-wrap: wrap; gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+  .topbar-actions { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .topbar-actions .btn { padding: 7px 11px; font-size: .82rem; }
+  .user-email { display: none; } /* non essentiel sur mobile, gagne de la place */
 
   /* Tables -> cartes empilees */
   .data-table thead { display: none; }

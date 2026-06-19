@@ -43,7 +43,7 @@ def calcul_totaux(prestations):
 
 
 def fmt_euro(montant):
-    """Formate un montant a la francaise : 1 234,56 EUR."""
+    """Formate un montant a la francaise : 1 234,56 €."""
     s = f"{montant:,.2f}"
     s = s.replace(",", " ").replace(".", ",")
-    return f"{s} EUR"
+    return f"{s} €"

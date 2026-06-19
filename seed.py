@@ -17,16 +17,16 @@ def run():
         "INSERT INTO devis (numero, client_nom, client_adresse, client_email, "
         "statut, notes, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?)",
         ("DEV-2026-0001", "SARL Dubois",
-         "15 avenue de la Republique\n75011 Paris",
+         "15 avenue de la République\n75011 Paris",
          "contact@dubois.fr", "envoye",
-         "Chantier renovation salle de bain - 2eme etage.",
+         "Chantier rénovation salle de bain - 2ème étage.",
          date.today().strftime("%d/%m/%Y")),
     )
     did = cur.lastrowid
     rows = [
-        ("Depose ancien carrelage et evacuation", 12, 18.0, 10.0),
-        ("Pose carrelage sol 60x60 (fourni et pose)", 12, 45.0, 10.0),
-        ("Fourniture et pose faience murale", 8, 32.5, 10.0),
+        ("Dépose ancien carrelage et évacuation", 12, 18.0, 10.0),
+        ("Pose carrelage sol 60x60 (fourni et posé)", 12, 45.0, 10.0),
+        ("Fourniture et pose faïence murale", 8, 32.5, 10.0),
         ("Plomberie - raccordements et robinetterie", 1, 350.0, 20.0),
     ]
     for i, (d, q, pu, t) in enumerate(rows):

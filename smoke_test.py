@@ -24,7 +24,14 @@ if not conn.execute("SELECT 1 FROM users WHERE email = ?", (EMAIL,)).fetchone():
         "VALUES (?, ?, ?, ?)",
         (EMAIL, generate_password_hash(MDP), "Smoke SARL", "2026-01-01 00:00:00"),
     )
-    conn.commit()
+else:
+    # Test idempotent : le mot de passe est reinitialise en fin de script,
+    # on le remet a la valeur connue pour que les relances reussissent.
+    conn.execute(
+        "UPDATE users SET password_hash = ? WHERE email = ?",
+        (generate_password_hash(MDP), EMAIL),
+    )
+conn.commit()
 conn.close()
 
 conn = get_db()

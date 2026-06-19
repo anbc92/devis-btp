@@ -16,7 +16,6 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
-    Flowable,
     Image,
 )
 
@@ -30,32 +29,17 @@ GRIS = colors.HexColor("#6b7280")
 GRIS_LIGNE = colors.HexColor("#d1d5db")
 
 
-class LogoPlaceholder(Flowable):
-    """Carre logo placeholder (a remplacer par une image plus tard)."""
-
-    def __init__(self, size=22 * mm):
-        super().__init__()
-        self.size = size
-        self.width = size
-        self.height = size
-
-    def draw(self):
-        c = self.canv
-        c.setFillColor(BLEU)
-        c.roundRect(0, 0, self.size, self.size, 3 * mm, stroke=0, fill=1)
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(self.size / 2, self.size / 2 + 4, "LOGO")
-        c.setFont("Helvetica", 6)
-        c.drawCentredString(self.size / 2, self.size / 2 - 6, "placeholder")
-
-
 def _logo_flowable(prof, size=22 * mm):
-    """Renvoie le logo de l'artisan, sinon le placeholder."""
+    """Renvoie le logo de l'artisan, ou None s'il n'en a pas configure.
+
+    Pas de placeholder : un document client ne doit pas afficher de cartouche
+    « LOGO ». En l'absence de logo, l'en-tete affiche simplement le bloc texte
+    de l'entreprise sur toute la largeur.
+    """
     path = logo_fs_path(prof)
     if path:
         return Image(path, width=size, height=size, kind="proportional")
-    return LogoPlaceholder(size)
+    return None
 
 
 def _styles():
@@ -114,7 +98,7 @@ def _date_limite_validite(date_creation, jours):
     return (base + timedelta(days=jours)).strftime("%d/%m/%Y")
 
 
-def _signature_flowable(signature, width=58 * mm, height=26 * mm):
+def _signature_flowable(signature, width=52 * mm, height=20 * mm):
     """Decode l'image base64 d'une signature et renvoie un Image ReportLab.
 
     Renvoie None si la donnee est absente ou illisible (rendu degrade sans
@@ -171,16 +155,16 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         f"<b><font size=13 color='#1f4e79'>{prof['nom_entreprise']}</font></b><br/>"
         f"{prof['gerant']}<br/>"
         f"{adresse_artisan}<br/>"
-        f"Tel : {prof['telephone']}<br/>{prof['email']}"
+        f"Tél : {prof['telephone']}<br/>{prof['email']}"
     )
     if is_facture:
         titre_html = (
             f"<para alignment='right'><font size=20 color='#1f4e79'><b>FACTURE</b>"
             f"</font><br/><font size=9 color='#6b7280'>"
             f"N&deg; {facture['numero_facture']}<br/>"
-            f"Date d'emission : {facture['date_emission']}<br/>"
-            f"Echeance : {facture['date_echeance']}<br/>"
-            f"Ref. devis : {devis['numero']}</font></para>"
+            f"Date d'émission : {facture['date_emission']}<br/>"
+            f"Échéance : {facture['date_echeance']}<br/>"
+            f"Réf. devis : {devis['numero']}</font></para>"
         )
     else:
         titre_html = (
@@ -188,19 +172,23 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
             f"<font size=9 color='#6b7280'>N&deg; {devis['numero']}<br/>"
             f"Date : {devis['date_creation']}</font></para>"
         )
+    logo = _logo_flowable(prof)
+    artisan_par = Paragraph(artisan_html, st["normal"])
+    if logo is not None:
+        bloc_artisan = Table(
+            [[logo, artisan_par]],
+            colWidths=[26 * mm, 60 * mm],
+            style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                              ("LEFTPADDING", (1, 0), (1, 0), 6)]))
+    else:
+        bloc_artisan = artisan_par
     entete = Table(
-        [[
-            Table([[_logo_flowable(prof), Paragraph(artisan_html, st["normal"])]],
-                  colWidths=[26 * mm, 60 * mm],
-                  style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
-                                    ("LEFTPADDING", (1, 0), (1, 0), 6)])),
-            Paragraph(titre_html, st["normal"]),
-        ]],
+        [[bloc_artisan, Paragraph(titre_html, st["normal"])]],
         colWidths=[92 * mm, 82 * mm],
     )
     entete.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(entete)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Spacer(1, 6 * mm))
 
     # --- Bloc client ---
     adresse_client = (devis["client_adresse"] or "").replace("\n", "<br/>")
@@ -220,7 +208,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         ("RIGHTPADDING", (0, 0), (-1, -1), 10),
     ]))
     story.append(bloc_client)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Spacer(1, 6 * mm))
 
     # --- Informations chantier (validite, debut des travaux, delai) ---
     # Bloc specifique au devis ; pour une facture, la date d'echeance figure
@@ -231,11 +219,11 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     delai = (devis.get("delai_execution") or "").strip()
 
     if not is_facture:
-        infos = [("Validite du devis", f"{validite_jours} jours")]
+        infos = [("Validité du devis", f"{validite_jours} jours")]
         if date_debut:
-            infos.append(("Debut des travaux (estime)", date_debut))
+            infos.append(("Début des travaux (estimé)", date_debut))
         if delai:
-            infos.append(("Delai d'execution", delai))
+            infos.append(("Délai d'exécution", delai))
 
         infos_html = "  &nbsp;|&nbsp;  ".join(
             f"<b>{label} :</b> {valeur}" for label, valeur in infos
@@ -255,8 +243,8 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
 
     # --- Tableau des prestations ---
     header = [
-        Paragraph("Designation", st["th"]),
-        Paragraph("Qte", st["th_r"]),
+        Paragraph("Désignation", st["th"]),
+        Paragraph("Qté", st["th_r"]),
         Paragraph("P.U. HT", st["th_r"]),
         Paragraph("TVA", st["th_r"]),
         Paragraph("Total HT", st["th_r"]),
@@ -322,7 +310,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         ("TEXTCOLOR", (1, n - 1), (1, n - 1), colors.white),
     ]))
     story.append(bloc_tot)
-    story.append(Spacer(1, 10 * mm))
+    story.append(Spacer(1, 7 * mm))
 
     # --- Notes eventuelles ---
     if devis.get("notes"):
@@ -333,7 +321,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
 
     # --- Conditions de paiement / reglement ---
     if is_facture:
-        cond_lignes = ["<b>Conditions de reglement</b>"]
+        cond_lignes = ["<b>Conditions de règlement</b>"]
         if facture.get("date_echeance"):
             cond_lignes.append(
                 f"Facture payable au plus tard le {facture['date_echeance']}.")
@@ -341,13 +329,13 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         cond_lignes.append(f"IBAN : {prof['iban']}")
     else:
         acompte = round(totaux["total_ttc"] * prof["acompte_pct"] / 100.0, 2)
-        validite_txt = f"Validite du devis : {validite_jours} jours"
+        validite_txt = f"Validité du devis : {validite_jours} jours"
         if date_limite:
             validite_txt += f" (valable jusqu'au {date_limite})"
         cond_lignes = [
             "<b>Conditions de paiement</b>",
             f"{validite_txt}.",
-            f"Acompte de {prof['acompte_pct']} % a la commande, soit "
+            f"Acompte de {prof['acompte_pct']} % à la commande, soit "
             f"{fmt_euro(acompte)}.",
             prof["conditions_paiement"],
             f"IBAN : {prof['iban']}",
@@ -356,14 +344,14 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     decennale = (prof.get("assurance_decennale") or "").strip()
     if decennale:
         assureur = (prof.get("assureur_nom") or "").strip()
-        mention_dec = f"Assurance decennale : {decennale}"
+        mention_dec = f"Assurance décennale : {decennale}"
         if assureur:
             mention_dec += f" (assureur : {assureur})"
         cond_lignes.append(mention_dec)
     # Franchise en base de TVA (auto-entrepreneur).
     if prof.get("auto_entrepreneur"):
         cond_lignes.append(
-            "<b>TVA non applicable - article 293 B du CGI.</b>")
+            "<b>TVA non applicable, article 293 B du CGI.</b>")
     cond_html = "<br/>".join(cond_lignes)
     bloc_cond = Table([[Paragraph(cond_html, st["small"])]], colWidths=[174 * mm])
     bloc_cond.setStyle(TableStyle([
@@ -382,7 +370,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         if facture.get("statut") == "payee":
             story.append(Paragraph(
                 "<para alignment='center'><font size=13 color='#16a34a'>"
-                "<b>FACTURE ACQUITTEE</b></font></para>", st["normal"]))
+                "<b>FACTURE ACQUITTÉE</b></font></para>", st["normal"]))
             story.append(Spacer(1, 4 * mm))
     else:
         # --- Mention "Devis valable jusqu'au ..." en bas de page ---
@@ -399,13 +387,13 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
                 droite.append(sig_img)
             droite.append(Paragraph(
                 f"<b>{signature.get('nom_signataire', '')}</b><br/>"
-                f"<font size=7 color='#6b7280'>Signe electroniquement le "
+                f"<font size=7 color='#6b7280'>Signé électroniquement le "
                 f"{signature.get('date_signature', '')}</font>", st["small"]))
             accord = Table([[
                 Paragraph(
                     "<b>Bon pour accord</b><br/>"
-                    "<font size=7 color='#6b7280'>Devis accepte et signe "
-                    "electroniquement par le client.</font>", st["small"]),
+                    "<font size=7 color='#6b7280'>Devis accepté et signé "
+                    "électroniquement par le client.</font>", st["small"]),
                 droite,
             ]], colWidths=[100 * mm, 74 * mm])
             accord.setStyle(TableStyle([
@@ -419,7 +407,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         else:
             accord = Table([[
                 Paragraph("Date et signature du client<br/>"
-                          "<font size=7 color='#6b7280'>precedee de la mention "
+                          "<font size=7 color='#6b7280'>précédée de la mention "
                           "&laquo; Bon pour accord &raquo;</font>", st["small"]),
                 Paragraph("", st["small"]),
             ]], colWidths=[100 * mm, 74 * mm])

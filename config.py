@@ -22,10 +22,10 @@ ARTISAN = {
 CONDITIONS = {
     "validite_jours": 30,
     "acompte_pct": 30,
-    "paiement": "Solde a la livraison. Reglement par cheque ou virement bancaire.",
+    "paiement": "Solde à la livraison. Règlement par chèque ou virement bancaire.",
     "mentions": "Devis gratuit. "
-                "Penalites de retard : taux legal en vigueur. "
-                "Indemnite forfaitaire pour frais de recouvrement : 40 EUR.",
+                "Pénalités de retard : taux légal en vigueur. "
+                "Indemnité forfaitaire pour frais de recouvrement : 40 €.",
     # Affichee uniquement si le profil est en franchise de TVA (auto-entrepreneur).
     "mention_tva": "TVA non applicable, article 293 B du CGI.",
 }
