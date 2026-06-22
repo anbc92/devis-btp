@@ -12,7 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Code applicatif
 COPY . .
 
-# Donnees persistantes (base SQLite, logos) montees en volume
+# Donnees persistantes (base SQLite, logos) montees en volume.
+# Le conteneur tourne en root (pas de directive USER) : indispensable pour
+# pouvoir ecrire sur le volume Railway, dont le point de montage appartient a
+# root. mkdir garantit l'existence du dossier meme hors volume monte.
+RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 ENV DB_PATH=/app/data/devis.db
 

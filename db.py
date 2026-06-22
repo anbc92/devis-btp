@@ -7,6 +7,11 @@ from pathlib import Path
 # Chemin de la base : surchargeable via DB_PATH (utile en conteneur/volume).
 DB_PATH = Path(os.environ.get("DB_PATH") or (Path(__file__).parent / "devis.db"))
 
+# Cree le dossier parent s'il manque (ex: volume vide /app/data sur Railway).
+# Sans ca, sqlite3.connect leve "unable to open database file" et gunicorn
+# crashe au demarrage (502 "Application failed to respond").
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
