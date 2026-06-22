@@ -16,9 +16,11 @@ COPY . .
 # Le conteneur tourne en root (pas de directive USER) : indispensable pour
 # pouvoir ecrire sur le volume Railway, dont le point de montage appartient a
 # root. mkdir garantit l'existence du dossier meme hors volume monte.
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data/uploads
 VOLUME ["/app/data"]
 ENV DB_PATH=/app/data/devis.db
+# Logos uploades sous le volume (MEDIA_ROOT/uploads) pour survivre aux deploys.
+ENV MEDIA_ROOT=/app/data
 
 EXPOSE 8000
 

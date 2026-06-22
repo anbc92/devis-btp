@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 from PIL import Image, UnidentifiedImageError
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import (
-    Flask, render_template, request, redirect, url_for, send_file, abort,
-    flash, session,
+    Flask, render_template, request, redirect, url_for, send_file,
+    send_from_directory, abort, flash, session,
 )
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
@@ -26,7 +26,7 @@ from db import get_db, init_db
 from calculs import calcul_totaux, ligne_total_ht, fmt_euro
 from pdf import generer_pdf
 from profil import (
-    get_profil, save_profil, save_smtp, logo_rel,
+    get_profil, save_profil, save_smtp, logo_rel, MEDIA_ROOT,
     CHAMPS_PROFIL, CHAMPS_SMTP,
 )
 from mail import envoyer_devis, envoyer_message, config_smtp_ok, MailError
@@ -99,8 +99,9 @@ def _entetes_securite(response):
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
-# Upload logo
-UPLOAD_DIR = Path(app.static_folder) / "uploads"
+# Upload logo. Sous MEDIA_ROOT (= /app/data sur volume Railway, static/ en
+# local) pour que les logos persistent aux redeploiements.
+UPLOAD_DIR = MEDIA_ROOT / "uploads"
 LOGO_MAX_BYTES = 2 * 1024 * 1024  # 2 Mo
 LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
@@ -108,6 +109,23 @@ LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 app.jinja_env.filters["euro"] = fmt_euro
 app.jinja_env.globals.update(STATUTS=STATUTS, STATUTS_FACTURE=STATUTS_FACTURE,
                              ARTISAN=ARTISAN)
+
+
+@app.route("/media/<path:filename>")
+def media(filename):
+    """Sert les fichiers media (logos) depuis MEDIA_ROOT.
+
+    Quand MEDIA_ROOT pointe sur le volume (/app/data), les logos ne sont plus
+    sous static/ : cette route les expose. On verifie que le chemin RESOLU
+    reste dans UPLOAD_DIR (uploads/) : sinon "uploads/../devis.db" servirait la
+    base SQLite voisine (le prefixe "uploads/" seul ne suffit pas a l'empecher).
+    """
+    cible = (MEDIA_ROOT / filename).resolve()
+    try:
+        cible.relative_to(UPLOAD_DIR.resolve())
+    except ValueError:
+        abort(404)
+    return send_from_directory(MEDIA_ROOT, filename)
 
 
 def current_user_id():
@@ -1072,7 +1090,7 @@ def signer(token):
 
 
 def _enregistrer_logo(fichier, user_id):
-    """Valide et sauvegarde le logo de l'utilisateur en static/uploads/.
+    """Valide et sauvegarde le logo de l'utilisateur dans UPLOAD_DIR.
 
     Renvoie (logo_rel, erreur). logo_rel est None si aucun fichier valide
     n'a ete fourni (le logo existant doit alors etre conserve).
@@ -1100,7 +1118,7 @@ def _enregistrer_logo(fichier, user_id):
 
     rel = logo_rel(user_id)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    img.save(Path(app.static_folder) / rel, format="PNG")
+    img.save(MEDIA_ROOT / rel, format="PNG")
     return rel, None
 
 

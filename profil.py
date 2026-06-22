@@ -39,7 +39,10 @@ _SMTP_ENV = {
     "mail_from": "MAIL_FROM",
 }
 
-STATIC_DIR = Path(__file__).parent / "static"
+# Racine des fichiers media (logos). Sur un volume persistant (Railway),
+# definir MEDIA_ROOT=/app/data pour que les logos survivent aux redeploiements.
+# En local, defaut = dossier static/ (servi par Flask).
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT") or (Path(__file__).parent / "static"))
 
 
 def _coerce_bool(valeur):
@@ -207,5 +210,5 @@ def logo_fs_path(profil):
     rel = (profil or {}).get("logo_path") or ""
     if not rel:
         return None
-    p = STATIC_DIR / rel
+    p = MEDIA_ROOT / rel
     return str(p) if p.exists() else None

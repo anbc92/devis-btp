@@ -91,7 +91,7 @@
     <h2>Logo</h2>
     {% if form.logo_path %}
     <div class="logo-preview">
-      <img src="{{ url_for('static', filename=form.logo_path) }}?v={{ range(100000)|random }}"
+      <img src="{{ url_for('media', filename=form.logo_path) }}?v={{ range(100000)|random }}"
            alt="Logo actuel" style="max-height:80px;max-width:200px;">
       <p class="muted">Logo actuel &mdash; envoyez un nouveau fichier pour le remplacer.</p>
     </div>
