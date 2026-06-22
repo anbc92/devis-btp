@@ -3,83 +3,166 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DevisBTP - Créez vos devis BTP en 2 minutes</title>
+  <title>DevisBTP — Créez vos devis BTP pro en 2 minutes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header class="topbar">
-    <div class="container topbar-inner">
+  <header class="landing-header">
+    <div class="container">
       <a href="{{ url_for('accueil') }}" class="brand">
         <span class="logo">BTP</span>
         <span>DevisBTP</span>
       </a>
-      {% if session.user_id %}
-      <a href="{{ url_for('index') }}" class="btn btn-primary">Accéder à mes devis</a>
-      {% else %}
-      <span class="topbar-actions">
-        <a href="{{ url_for('connexion') }}" class="btn btn-light">Connexion</a>
-        <a href="{{ url_for('inscription') }}" class="btn btn-primary">Inscription</a>
-      </span>
-      {% endif %}
+      <nav class="landing-nav">
+        {% if session.user_id %}
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Accéder à mes devis</a>
+        {% else %}
+        <a href="{{ url_for('connexion') }}" class="btn btn-light btn-sm">Connexion</a>
+        <a href="{{ url_for('inscription') }}" class="btn btn-primary btn-sm">Commencer gratuitement</a>
+        {% endif %}
+      </nav>
     </div>
   </header>
 
   <main>
     <!-- Hero -->
     <section class="hero">
-      <div class="container">
-        <h1 class="hero-title">Créez vos devis BTP en 2 minutes</h1>
-        <p class="hero-subtitle">Simple, rapide et professionnel</p>
-        <a href="{{ url_for('nouveau') if session.user_id else url_for('inscription') }}" class="btn btn-primary btn-cta">Créer mon premier devis</a>
-      </div>
-    </section>
+      <div class="container hero-grid">
+        <div>
+          <span class="hero-eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-3 7h6l-3 7"/><path d="M5 12a7 7 0 0 0 7 7"/></svg>
+            Spécial artisans du bâtiment
+          </span>
+          <h1 class="hero-title">Créez vos devis BTP <span class="accent">pro en 2 minutes</span></h1>
+          <p class="hero-subtitle">
+            Fini les devis bricolés sur Word. Remplissez, ajoutez vos prestations,
+            et obtenez un PDF propre à votre image — prêt à envoyer à votre client.
+          </p>
+          <div class="hero-cta">
+            <a href="{{ url_for('nouveau') if session.user_id else url_for('inscription') }}" class="btn btn-primary btn-cta">
+              Créer mon premier devis
+            </a>
+            <a href="{{ url_for('connexion') }}" class="btn btn-light btn-cta">J'ai déjà un compte</a>
+          </div>
+          <div class="hero-trust">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Gratuit pour commencer</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Conforme à la réglementation BTP</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Sans logiciel à installer</span>
+          </div>
+        </div>
 
-    <!-- Features -->
-    <section class="container section">
-      <div class="features">
-        <div class="card feature-card">
-          <div class="feature-icon">&#9889;</div>
-          <h2>Rapide</h2>
-          <p class="muted">Un devis complet prêt à envoyer en quelques clics.</p>
-        </div>
-        <div class="card feature-card">
-          <div class="feature-icon">&#128196;</div>
-          <h2>PDF Pro</h2>
-          <p class="muted">Des PDF soignés à votre image, avec votre logo.</p>
-        </div>
-        <div class="card feature-card">
-          <div class="feature-icon">&#9989;</div>
-          <h2>Suivi facile</h2>
-          <p class="muted">Brouillon, envoyé, accepté : suivez chaque devis.</p>
+        <!-- Aperçu produit -->
+        <div class="hero-mock" aria-hidden="true">
+          <div class="mock-bar"><i></i><i></i><i></i></div>
+          <div class="mock-body">
+            <div class="mock-head">
+              <div class="mock-logo">BTP</div>
+              <div class="mock-title">
+                <b>DEVIS</b>
+                <small>N° DEV-2026-0042</small>
+              </div>
+            </div>
+            <div class="mock-line mid"></div>
+            <div class="mock-line short"></div>
+            <div class="mock-row"><span></span><b></b></div>
+            <div class="mock-row"><span></span><b></b></div>
+            <div class="mock-row"><span></span><b></b></div>
+            <div class="mock-total"><span>Total TTC</span><b>4&nbsp;680,00&nbsp;€</b></div>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Comment ça marche -->
-    <section class="container section">
-      <h2 class="section-title">Comment ça marche</h2>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <h3>Remplissez les infos client</h3>
-          <p class="muted">Nom, adresse et email du client.</p>
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Comment ça marche</h2>
+        <p class="section-lead">Trois étapes, et votre devis est prêt. Pas de formation, pas de prise de tête.</p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span class="step-num">1</span>
+            <h3>Renseignez le client</h3>
+            <p>Nom, adresse et e-mail. Quelques secondes suffisent.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <span class="step-num">2</span>
+            <h3>Ajoutez vos prestations</h3>
+            <p>Désignation, quantité, prix, TVA. Les totaux se calculent tout seuls.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+            </div>
+            <span class="step-num">3</span>
+            <h3>Générez le PDF</h3>
+            <p>Téléchargez, imprimez ou envoyez votre devis par e-mail.</p>
+          </div>
         </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <h3>Ajoutez vos prestations</h3>
-          <p class="muted">Désignations, quantités, prix et TVA.</p>
+      </div>
+    </section>
+
+    <!-- Bénéfices -->
+    <section class="section section-alt">
+      <div class="container">
+        <h2 class="section-title">Tout ce qu'il vous faut pour facturer pro</h2>
+        <p class="section-lead">Pensé pour les artisans, pas pour les comptables.</p>
+        <div class="features">
+          <div class="card feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            </div>
+            <h3>PDF à votre image</h3>
+            <p>Votre logo, vos coordonnées, une mise en page nette et soignée.</p>
+          </div>
+          <div class="card feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+            </div>
+            <h3>Envoi par e-mail</h3>
+            <p>Transmettez le devis directement au client, PDF joint automatiquement.</p>
+          </div>
+          <div class="card feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h3>Conforme BTP</h3>
+            <p>Mentions légales, validité, assurance décennale, TVA : tout y est.</p>
+          </div>
+          <div class="card feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+            </div>
+            <h3>Signature en ligne</h3>
+            <p>Le client signe le devis depuis son téléphone, sans créer de compte.</p>
+          </div>
         </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <h3>Générez et envoyez le PDF</h3>
-          <p class="muted">Téléchargez ou imprimez votre devis pro.</p>
-        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section">
+      <div class="container cta-band">
+        <h2>Prêt à envoyer votre premier devis&nbsp;?</h2>
+        <p>Créez votre compte gratuitement et lancez-vous en moins de 5 minutes.</p>
+        <a href="{{ url_for('nouveau') if session.user_id else url_for('inscription') }}" class="btn btn-primary btn-cta">Commencer gratuitement</a>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <div class="container">DevisBTP</div>
+    <div class="container">
+      <span class="footer-brand"><span class="logo" style="width:26px;height:26px;font-size:.6rem;">BTP</span> DevisBTP</span>
+      <span>Devis &amp; factures pour artisans du bâtiment</span>
+    </div>
   </footer>
 </body>
 </html>

@@ -4,13 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Erreur {{ code }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <main class="container">
-    <div class="empty" style="margin-top:64px;">
-      <h1 style="font-size:3rem;color:var(--bleu);margin:0;">{{ code }}</h1>
-      <p>{{ message }}</p>
+  <main class="container" style="min-height:80vh;display:grid;place-items:center;">
+    <div style="text-align:center;max-width:440px;">
+      <div style="font-size:4rem;font-weight:800;color:var(--primary);line-height:1;letter-spacing:-.03em;">{{ code }}</div>
+      <p style="font-size:1.1rem;margin:12px 0 24px;">{{ message }}</p>
       <a href="{{ url_for('accueil') }}" class="btn btn-primary">Retour à l'accueil</a>
     </div>
   </main>

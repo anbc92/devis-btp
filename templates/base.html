@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Devis BTP{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,25 +14,50 @@
     <div class="container topbar-inner">
       <a href="{{ url_for('index') if session.user_id else url_for('accueil') }}" class="brand">
         <span class="logo">BTP</span>
-        <span>{{ profil.nom_entreprise }} <small>&middot; Devis</small></span>
+        <span>{{ profil.nom_entreprise or 'DevisBTP' }}</span>
       </a>
+
+      {% if session.user_id %}
+      <nav class="nav">
+        <a href="{{ url_for('index') }}" class="nav-link {{ 'active' if request.endpoint in ['index', 'voir', 'nouveau', 'modifier'] }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+          Devis
+        </a>
+        <a href="{{ url_for('factures') }}" class="nav-link {{ 'active' if request.endpoint in ['factures', 'voir_facture'] }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>
+          Factures
+        </a>
+      </nav>
+
+      <span class="spacer"></span>
+
       <div class="topbar-actions">
-        {% if session.user_id %}
-        <a href="{{ url_for('index') }}" class="btn btn-light">Mes devis</a>
-        <a href="{{ url_for('factures') }}" class="btn btn-light">Mes factures</a>
-        <a href="{{ url_for('parametres') }}" class="btn btn-light">Paramètres</a>
-        <a href="{{ url_for('profil') }}" class="btn btn-light">Mon profil &#9881;&#65039;</a>
-        <a href="{{ url_for('nouveau') }}" class="btn btn-primary">+ Nouveau devis</a>
+        <a href="{{ url_for('nouveau') }}" class="btn btn-primary btn-sm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          Nouveau devis
+        </a>
+        <a href="{{ url_for('parametres') }}" class="nav-link {{ 'active' if request.endpoint == 'parametres' }}" title="Paramètres d'envoi">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </a>
+        <a href="{{ url_for('profil') }}" class="nav-link {{ 'active' if request.endpoint == 'profil' }}" title="Mon profil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </a>
         <span class="user-email" title="Connecté">{{ session.email }}</span>
         <form method="post" action="{{ url_for('deconnexion') }}" class="inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-light">Déconnexion</button>
+          <button type="submit" class="btn btn-light btn-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            Déconnexion
+          </button>
         </form>
-        {% else %}
-        <a href="{{ url_for('connexion') }}" class="btn btn-light">Connexion</a>
-        <a href="{{ url_for('inscription') }}" class="btn btn-primary">Inscription</a>
-        {% endif %}
       </div>
+      {% else %}
+      <span class="spacer"></span>
+      <div class="topbar-actions">
+        <a href="{{ url_for('connexion') }}" class="btn btn-light btn-sm">Connexion</a>
+        <a href="{{ url_for('inscription') }}" class="btn btn-primary btn-sm">Commencer gratuitement</a>
+      </div>
+      {% endif %}
     </div>
   </header>
 
@@ -44,8 +72,12 @@
 
   <footer class="footer">
     <div class="container">
-      {{ profil.nom_entreprise }} &middot; SIRET {{ profil.siret }} &middot;
-      {{ profil.telephone }} &middot; {{ profil.email }}
+      <span class="footer-brand"><span class="logo" style="width:26px;height:26px;font-size:.6rem;">BTP</span> {{ profil.nom_entreprise or 'DevisBTP' }}</span>
+      <span>
+        {% if profil.siret %}SIRET {{ profil.siret }} &middot; {% endif %}
+        {% if profil.telephone %}{{ profil.telephone }} &middot; {% endif %}
+        {{ profil.email or '' }}
+      </span>
     </div>
   </footer>
   {% block scripts %}{% endblock %}
