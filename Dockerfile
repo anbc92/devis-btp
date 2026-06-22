@@ -12,12 +12,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Code applicatif
 COPY . .
 
-# Donnees persistantes (base SQLite, logos) montees en volume.
-# Le conteneur tourne en root (pas de directive USER) : indispensable pour
-# pouvoir ecrire sur le volume Railway, dont le point de montage appartient a
-# root. mkdir garantit l'existence du dossier meme hors volume monte.
+# Donnees persistantes (base SQLite, logos). Le volume est gere cote Railway
+# (monte sur /app/data via le dashboard) : NE PAS utiliser l'instruction Docker
+# VOLUME, que le builder Railway refuse ("docker VOLUME is not supported, use
+# Railway Volumes") -> echec du build. Le conteneur tourne en root (pas de
+# directive USER) pour pouvoir ecrire sur le volume. mkdir garantit l'existence
+# du dossier hors volume monte (build local, etc.).
 RUN mkdir -p /app/data/uploads
-VOLUME ["/app/data"]
 ENV DB_PATH=/app/data/devis.db
 # Logos uploades sous le volume (MEDIA_ROOT/uploads) pour survivre aux deploys.
 ENV MEDIA_ROOT=/app/data
