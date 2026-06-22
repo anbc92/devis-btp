@@ -22,11 +22,18 @@ from reportlab.platypus import (
 from calculs import calcul_totaux, ligne_total_ht, fmt_euro
 from profil import get_profil, logo_fs_path
 
-# Charte graphique
-BLEU = colors.HexColor("#1f4e79")
-BLEU_CLAIR = colors.HexColor("#dbe5f1")
-GRIS = colors.HexColor("#6b7280")
-GRIS_LIGNE = colors.HexColor("#d1d5db")
+# Charte graphique — alignee sur le site (bleu confiance, plat, aere).
+PRIMARY = colors.HexColor("#2563EB")
+PRIMARY_DARK = colors.HexColor("#1D4ED8")
+PRIMARY_LIGHT = colors.HexColor("#EFF4FF")
+TEXT = colors.HexColor("#1E293B")
+MUTED = colors.HexColor("#64748B")
+BORDER = colors.HexColor("#E2E8F0")
+BG_ALT = colors.HexColor("#F8FAFC")
+SUCCESS = colors.HexColor("#16A34A")
+
+# Hauteur du filet d'accent en haut de page.
+BAR_H = 3 * mm
 
 
 def _logo_flowable(prof, size=22 * mm):
@@ -46,25 +53,32 @@ def _styles():
     base = getSampleStyleSheet()
     styles = {
         "small": ParagraphStyle("small", parent=base["Normal"], fontSize=8,
-                                leading=11, textColor=GRIS),
-        "normal": ParagraphStyle("normal", parent=base["Normal"], fontSize=9,
-                                 leading=12),
-        "bold": ParagraphStyle("bold", parent=base["Normal"], fontSize=9,
-                               leading=12, fontName="Helvetica-Bold"),
+                                leading=11, textColor=MUTED),
+        "normal": ParagraphStyle("normal", parent=base["Normal"], fontSize=9.5,
+                                 leading=13, textColor=TEXT),
+        "bold": ParagraphStyle("bold", parent=base["Normal"], fontSize=9.5,
+                               leading=13, fontName="Helvetica-Bold",
+                               textColor=TEXT),
+        # Etiquette discrete (ex: "DEVIS POUR")
+        "label": ParagraphStyle("label", parent=base["Normal"], fontSize=7.5,
+                                 leading=11, fontName="Helvetica-Bold",
+                                 textColor=MUTED),
         "h_artisan": ParagraphStyle("h_artisan", parent=base["Normal"],
-                                    fontSize=13, leading=15,
-                                    fontName="Helvetica-Bold", textColor=BLEU),
-        "titre": ParagraphStyle("titre", parent=base["Normal"], fontSize=20,
-                                fontName="Helvetica-Bold", textColor=BLEU,
-                                alignment=TA_RIGHT),
+                                    fontSize=13, leading=16,
+                                    fontName="Helvetica-Bold", textColor=TEXT),
+        "titre": ParagraphStyle("titre", parent=base["Normal"], fontSize=26,
+                                fontName="Helvetica-Bold", textColor=PRIMARY,
+                                alignment=TA_RIGHT, leading=28),
         "sous_titre": ParagraphStyle("sous_titre", parent=base["Normal"],
-                                     fontSize=9, textColor=GRIS, alignment=TA_RIGHT),
-        "cell": ParagraphStyle("cell", parent=base["Normal"], fontSize=9, leading=12),
-        "cell_r": ParagraphStyle("cell_r", parent=base["Normal"], fontSize=9,
-                                 leading=12, alignment=TA_RIGHT),
-        "th": ParagraphStyle("th", parent=base["Normal"], fontSize=9,
+                                     fontSize=9, leading=13, textColor=MUTED,
+                                     alignment=TA_RIGHT),
+        "cell": ParagraphStyle("cell", parent=base["Normal"], fontSize=9.5,
+                               leading=13, textColor=TEXT),
+        "cell_r": ParagraphStyle("cell_r", parent=base["Normal"], fontSize=9.5,
+                                 leading=13, alignment=TA_RIGHT, textColor=TEXT),
+        "th": ParagraphStyle("th", parent=base["Normal"], fontSize=8.5,
                              fontName="Helvetica-Bold", textColor=colors.white),
-        "th_r": ParagraphStyle("th_r", parent=base["Normal"], fontSize=9,
+        "th_r": ParagraphStyle("th_r", parent=base["Normal"], fontSize=8.5,
                                fontName="Helvetica-Bold", textColor=colors.white,
                                alignment=TA_RIGHT),
     }
@@ -140,7 +154,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
         leftMargin=18 * mm, rightMargin=18 * mm,
-        topMargin=16 * mm, bottomMargin=16 * mm,
+        topMargin=20 * mm, bottomMargin=18 * mm,
         title=(facture["numero_facture"] if is_facture
                else f"Devis {devis['numero']}"),
     )
@@ -152,15 +166,15 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     # --- En-tete : logo + artisan a gauche, titre du document a droite ---
     adresse_artisan = (prof["adresse"] or "").replace("\n", "<br/>")
     artisan_html = (
-        f"<b><font size=13 color='#1f4e79'>{prof['nom_entreprise']}</font></b><br/>"
-        f"{prof['gerant']}<br/>"
+        f"<b><font size=13 color='#1E293B'>{prof['nom_entreprise']}</font></b><br/>"
+        f"<font color='#64748B'>{prof['gerant']}<br/>"
         f"{adresse_artisan}<br/>"
-        f"Tél : {prof['telephone']}<br/>{prof['email']}"
+        f"Tél : {prof['telephone']}<br/>{prof['email']}</font>"
     )
     if is_facture:
         titre_html = (
-            f"<para alignment='right'><font size=20 color='#1f4e79'><b>FACTURE</b>"
-            f"</font><br/><font size=9 color='#6b7280'>"
+            f"<para alignment='right'><font size=26 color='#2563EB'><b>FACTURE</b>"
+            f"</font><br/><font size=9 color='#64748B'>"
             f"N&deg; {facture['numero_facture']}<br/>"
             f"Date d'émission : {facture['date_emission']}<br/>"
             f"Échéance : {facture['date_echeance']}<br/>"
@@ -168,8 +182,8 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         )
     else:
         titre_html = (
-            f"<para alignment='right'><font size=20 color='#1f4e79'><b>DEVIS</b></font><br/>"
-            f"<font size=9 color='#6b7280'>N&deg; {devis['numero']}<br/>"
+            f"<para alignment='right'><font size=26 color='#2563EB'><b>DEVIS</b></font><br/>"
+            f"<font size=9 color='#64748B'>N&deg; {devis['numero']}<br/>"
             f"Date : {devis['date_creation']}</font></para>"
         )
     logo = _logo_flowable(prof)
@@ -177,9 +191,9 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     if logo is not None:
         bloc_artisan = Table(
             [[logo, artisan_par]],
-            colWidths=[26 * mm, 60 * mm],
+            colWidths=[26 * mm, 64 * mm],
             style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
-                              ("LEFTPADDING", (1, 0), (1, 0), 6)]))
+                              ("LEFTPADDING", (1, 0), (1, 0), 8)]))
     else:
         bloc_artisan = artisan_par
     entete = Table(
@@ -188,24 +202,28 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     )
     entete.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(entete)
-    story.append(Spacer(1, 6 * mm))
+    story.append(Spacer(1, 9 * mm))
 
-    # --- Bloc client ---
+    # --- Bloc client (etiquette + coordonnees, carte legere a gauche) ---
+    label_client = "FACTURÉ À" if is_facture else "DEVIS POUR"
     adresse_client = (devis["client_adresse"] or "").replace("\n", "<br/>")
     client_html = (
-        f"<b>CLIENT</b><br/>{devis['client_nom']}<br/>{adresse_client}"
+        f"<font size=7.5 color='#64748B'><b>{label_client}</b></font><br/>"
+        f"<font size=11 color='#1E293B'><b>{devis['client_nom']}</b></font>"
     )
+    if adresse_client:
+        client_html += f"<br/><font color='#64748B'>{adresse_client}</font>"
     if devis.get("client_email"):
-        client_html += f"<br/>{devis['client_email']}"
+        client_html += f"<br/><font color='#64748B'>{devis['client_email']}</font>"
     bloc_client = Table([[Paragraph(client_html, st["normal"])]],
-                        colWidths=[82 * mm], hAlign="RIGHT")
+                        colWidths=[100 * mm], hAlign="LEFT")
     bloc_client.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.6, GRIS_LIGNE),
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, -1), BG_ALT),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.4, PRIMARY),  # filet d'accent a gauche
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
     ]))
     story.append(bloc_client)
     story.append(Spacer(1, 6 * mm))
@@ -225,29 +243,27 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         if delai:
             infos.append(("Délai d'exécution", delai))
 
-        infos_html = "  &nbsp;|&nbsp;  ".join(
-            f"<b>{label} :</b> {valeur}" for label, valeur in infos
+        infos_html = "&nbsp;&nbsp;&nbsp;".join(
+            f"<font color='#64748B'><b>{label} :</b> {valeur}</font>"
+            for label, valeur in infos
         )
         bloc_infos = Table([[Paragraph(infos_html, st["small"])]],
                            colWidths=[174 * mm])
         bloc_infos.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.5, GRIS_LIGNE),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 10),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ]))
         story.append(bloc_infos)
-        story.append(Spacer(1, 6 * mm))
+        story.append(Spacer(1, 5 * mm))
 
     # --- Tableau des prestations ---
     header = [
-        Paragraph("Désignation", st["th"]),
-        Paragraph("Qté", st["th_r"]),
+        Paragraph("DÉSIGNATION", st["th"]),
+        Paragraph("QTÉ", st["th_r"]),
         Paragraph("P.U. HT", st["th_r"]),
         Paragraph("TVA", st["th_r"]),
-        Paragraph("Total HT", st["th_r"]),
+        Paragraph("TOTAL HT", st["th_r"]),
     ]
     data = [header]
     for p in prestations:
@@ -263,60 +279,67 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     table = Table(data, colWidths=[84 * mm, 16 * mm, 26 * mm, 16 * mm, 32 * mm],
                   repeatRows=1)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), BLEU),
-        ("TOPPADDING", (0, 0), (-1, 0), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
-        ("TOPPADDING", (0, 1), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        # En-tete
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+        ("TOPPADDING", (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 9),
+        # Corps
+        ("TOPPADDING", (0, 1), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.4, GRIS_LIGNE),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f3f6fb")]),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.5, BORDER),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_ALT]),
     ]))
     story.append(table)
-    story.append(Spacer(1, 5 * mm))
+    story.append(Spacer(1, 6 * mm))
 
-    # --- Totaux ---
+    # --- Totaux : HT + ventilation TVA (discrets), puis bloc TTC bleu ---
     totaux = calcul_totaux(prestations)
-    totaux_rows = [
-        ["Total HT", fmt_euro(totaux["total_ht"])],
-    ]
+    petites_rows = [["Total HT", fmt_euro(totaux["total_ht"])]]
     for v in totaux["ventilation"]:
-        totaux_rows.append([f"TVA {v['taux']:g} % (sur {fmt_euro(v['base'])})",
-                            fmt_euro(v["montant"])])
-    totaux_rows.append(["Total TTC", fmt_euro(totaux["total_ttc"])])
+        petites_rows.append([f"TVA {v['taux']:g} % (sur {fmt_euro(v['base'])})",
+                             fmt_euro(v["montant"])])
 
-    cells = []
-    for i, (label, val) in enumerate(totaux_rows):
-        is_ttc = (i == len(totaux_rows) - 1)
-        style = st["bold"] if is_ttc else st["normal"]
-        cells.append([Paragraph(label, style),
-                      Paragraph(val, st["cell_r"] if not is_ttc else
-                                ParagraphStyle("ttc_r", parent=st["cell_r"],
-                                               fontName="Helvetica-Bold",
-                                               textColor=colors.white))])
-
-    bloc_tot = Table(cells, colWidths=[52 * mm, 38 * mm], hAlign="RIGHT")
-    n = len(totaux_rows)
-    bloc_tot.setStyle(TableStyle([
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    cells = [[Paragraph(f"<font color='#64748B'>{label}</font>", st["normal"]),
+              Paragraph(val, st["cell_r"])] for label, val in petites_rows]
+    bloc_petits = Table(cells, colWidths=[55 * mm, 35 * mm], hAlign="RIGHT")
+    bloc_petits.setStyle(TableStyle([
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("LINEABOVE", (0, 0), (-1, 0), 0.6, GRIS_LIGNE),
-        ("LINEBELOW", (0, 0), (-1, n - 2), 0.4, GRIS_LIGNE),
-        ("BACKGROUND", (0, n - 1), (-1, n - 1), BLEU),
-        ("TEXTCOLOR", (1, n - 1), (1, n - 1), colors.white),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.5, BORDER),
     ]))
-    story.append(bloc_tot)
-    story.append(Spacer(1, 7 * mm))
+    story.append(bloc_petits)
+
+    # Bloc Total TTC mis en avant (fond bleu, texte blanc, plus grand).
+    ttc_style = ParagraphStyle("ttc_l", parent=st["bold"], fontSize=12,
+                               textColor=colors.white)
+    ttc_style_r = ParagraphStyle("ttc_r2", parent=st["bold"], fontSize=13,
+                                 textColor=colors.white, alignment=TA_RIGHT)
+    bloc_ttc = Table([[Paragraph("TOTAL TTC", ttc_style),
+                       Paragraph(fmt_euro(totaux["total_ttc"]), ttc_style_r)]],
+                     colWidths=[55 * mm, 35 * mm], hAlign="RIGHT")
+    bloc_ttc.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), PRIMARY),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(bloc_ttc)
+    story.append(Spacer(1, 8 * mm))
 
     # --- Notes eventuelles ---
     if devis.get("notes"):
         notes_html = devis["notes"].replace("\n", "<br/>")
-        story.append(Paragraph("<b>Notes :</b>", st["normal"]))
-        story.append(Paragraph(notes_html, st["small"]))
+        story.append(Paragraph("<b>Notes</b>", st["bold"]))
+        story.append(Spacer(1, 1.5 * mm))
+        story.append(Paragraph(f"<font color='#64748B'>{notes_html}</font>",
+                               st["small"]))
         story.append(Spacer(1, 6 * mm))
 
     # --- Conditions de paiement / reglement ---
@@ -355,12 +378,12 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
     cond_html = "<br/>".join(cond_lignes)
     bloc_cond = Table([[Paragraph(cond_html, st["small"])]], colWidths=[174 * mm])
     bloc_cond.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), BLEU_CLAIR),
-        ("BOX", (0, 0), (-1, -1), 0.5, BLEU),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, -1), PRIMARY_LIGHT),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.4, PRIMARY),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
     ]))
     story.append(bloc_cond)
     story.append(Spacer(1, 6 * mm))
@@ -369,7 +392,7 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         # --- Mention "Facture acquittee" si la facture est payee ---
         if facture.get("statut") == "payee":
             story.append(Paragraph(
-                "<para alignment='center'><font size=13 color='#16a34a'>"
+                "<para alignment='center'><font size=13 color='#16A34A'>"
                 "<b>FACTURE ACQUITTÉE</b></font></para>", st["normal"]))
             story.append(Spacer(1, 4 * mm))
     else:
@@ -387,17 +410,17 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
                 droite.append(sig_img)
             droite.append(Paragraph(
                 f"<b>{signature.get('nom_signataire', '')}</b><br/>"
-                f"<font size=7 color='#6b7280'>Signé électroniquement le "
+                f"<font size=7 color='#64748B'>Signé électroniquement le "
                 f"{signature.get('date_signature', '')}</font>", st["small"]))
             accord = Table([[
                 Paragraph(
                     "<b>Bon pour accord</b><br/>"
-                    "<font size=7 color='#6b7280'>Devis accepté et signé "
+                    "<font size=7 color='#64748B'>Devis accepté et signé "
                     "électroniquement par le client.</font>", st["small"]),
                 droite,
             ]], colWidths=[100 * mm, 74 * mm])
             accord.setStyle(TableStyle([
-                ("BOX", (1, 0), (1, 0), 0.5, GRIS_LIGNE),
+                ("BOX", (1, 0), (1, 0), 0.6, BORDER),
                 ("TOPPADDING", (0, 0), (-1, -1), 8),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -407,31 +430,37 @@ def generer_pdf(devis, prestations, prof=None, signature=None, facture=None):
         else:
             accord = Table([[
                 Paragraph("Date et signature du client<br/>"
-                          "<font size=7 color='#6b7280'>précédée de la mention "
+                          "<font size=7 color='#64748B'>précédée de la mention "
                           "&laquo; Bon pour accord &raquo;</font>", st["small"]),
                 Paragraph("", st["small"]),
             ]], colWidths=[100 * mm, 74 * mm])
             accord.setStyle(TableStyle([
-                ("BOX", (1, 0), (1, 0), 0.5, GRIS_LIGNE),
+                ("BOX", (1, 0), (1, 0), 0.6, BORDER),
                 ("TOPPADDING", (0, 0), (-1, -1), 18),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]))
         story.append(accord)
 
-    pied = _make_pied(prof)
+    pied = _make_page_decoration(prof)
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
     buf.seek(0)
     return buf
 
 
-def _make_pied(prof):
-    """Construit le callback de pied de page (mentions legales de l'artisan)."""
+def _make_page_decoration(prof):
+    """Construit le callback de decoration de page : filet d'accent en haut +
+    pied de page (mentions legales de l'artisan)."""
     adresse_ligne = (prof["adresse"] or "").replace("\n", ", ")
 
-    def _pied(canvas, doc):
+    def _decor(canvas, doc):
         canvas.saveState()
+        # Filet d'accent bleu en haut de page (toute la largeur).
+        canvas.setFillColor(PRIMARY)
+        canvas.rect(0, A4[1] - BAR_H, A4[0], BAR_H, stroke=0, fill=1)
+
+        # Pied de page : mentions legales centrees.
         canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(GRIS)
+        canvas.setFillColor(MUTED)
         ligne = (
             f"{prof['nom_entreprise']} - SIRET {prof['siret']} - "
             f"TVA {prof['tva_intra']} - APE {prof['ape']} - {adresse_ligne}"
@@ -443,4 +472,4 @@ def _make_pied(prof):
         canvas.drawCentredString(A4[0] / 2, 6 * mm, prof["mentions"][:140])
         canvas.restoreState()
 
-    return _pied
+    return _decor
