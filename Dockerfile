@@ -5,9 +5,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Dependances
+# Dependances (gunicorn et Pillow sont dans requirements.txt)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Code applicatif
 COPY . .
@@ -20,4 +20,6 @@ EXPOSE 8000
 
 # SECRET_KEY / SESSION_COOKIE_SECURE / MAIL_* a fournir via l'environnement.
 # 2 workers gunicorn ; ajuster selon la charge.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "app:app"]
+# Forme shell (pas exec) pour que $PORT injecte par Railway soit interprete ;
+# repli sur 8000 en local. Railway route le trafic vers $PORT, pas un port fixe.
+CMD gunicorn --bind "0.0.0.0:${PORT:-8000}" --workers 2 app:app
